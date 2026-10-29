@@ -144,7 +144,7 @@ src/main/java/de/mulej/
   gui/                        Swing UI (previews, crop dialog, palette editor – shared with FlipperJ)
   i18n/                       English/German texts
 src/test/java/...             JUnit 5 tests
-packaging/                    icon (mule, C64 light red on C64 blue, like the FlipperJ dolphin) as SVG, PNG and .ico;
+packaging/                    icon (grey mule, C64 light grey on C64 blue, like the FlipperJ dolphin) as SVG, PNG and .ico;
                               launcher settings for mulej-cli
 .github/workflows/            installers for Windows, macOS and Linux
 ```
