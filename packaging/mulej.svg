@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<!-- MuleJ icon: mule head with long ears, C64 colours yellow (#B8C76F) on blue (#352879) -->
+<rect x="16" y="16" width="480" height="480" rx="96" fill="#352879"/>
+<path fill="#B8C76F" d="M128,372 C104,364 90,338 98,312 C108,280 146,232 186,198 L206,180
+ L214,74 C216,46 246,42 252,70 L262,168 L292,78 C302,52 332,58 326,86 L304,186
+ C340,204 378,246 396,306 L424,452 L286,452 C282,410 264,378 236,364 C204,380 158,386 128,372 Z"/>
+<circle cx="214" cy="226" r="13" fill="#352879"/>
+<ellipse cx="116" cy="322" rx="9" ry="12" fill="#352879"/>
+<path d="M104,350 C120,356 140,356 156,350" stroke="#352879" stroke-width="7" fill="none" stroke-linecap="round"/>
+</svg>
