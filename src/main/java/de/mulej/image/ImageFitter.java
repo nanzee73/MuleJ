@@ -42,25 +42,31 @@ public final class ImageFitter {
         public Settings withCrop(Rectangle r) { return new Settings(r, mode, filter, aspect, fill); }
 
         /**
-         * Starting point for a picture that is not C64-sized: larger pictures get the largest centered frame with
-         * the target aspect (scaled down), smaller ones are scaled up to fit (bicubic). Pictures that fit 320×200 by a whole-number
-         * factor are enlarged exactly with nearest neighbour, so pixel art stays crisp.
+         * Starting point for a picture that is not C64-sized: the largest centered frame in the C64 aspect ratio
+         * (PAL, as on a real monitor), filled into 320×200. Larger pictures are scaled down (area average),
+         * smaller ones are scaled up along their shorter side (bicubic) – there is never a border.
+         * Pixel art that fits 320×200 (hires) or 160×200 (multicolor) by a whole-number factor, e.g. 160×100 or
+         * 640×400, is taken completely and scaled exactly with nearest neighbour, so it stays crisp.
          */
         public static Settings suggested(BufferedImage img) {
             int w = img.getWidth(), h = img.getHeight();
             Settings d = defaults();
-            if (w >= W && h >= H) {
-                double a = d.aspect().ratio;
-                int cw = w, ch = h;
-                if ((double) w / h > a) cw = (int) Math.round(h * a);
-                else ch = (int) Math.round(w / a);
-                return new Settings(new Rectangle((w - cw) / 2, (h - ch) / 2, cw, ch), ScaleMode.FILL,
-                        Filter.AREA, d.aspect(), d.fill());
+            if (isWholeNumberScale(w, h)) return new Settings(null, ScaleMode.STRETCH, Filter.NEAREST, Aspect.FREE, d.fill());
+            double a = d.aspect().ratio;
+            int cw = w, ch = h;
+            if ((double) w / h > a) cw = Math.max(1, (int) Math.round(h * a));
+            else ch = Math.max(1, (int) Math.round(w / a));
+            Filter f = ch >= H ? Filter.AREA : Filter.BICUBIC;
+            return new Settings(new Rectangle((w - cw) / 2, (h - ch) / 2, cw, ch), ScaleMode.FILL, f, d.aspect(), d.fill());
+        }
+
+        /** w×h is 320×200 or 160×200 scaled by a whole number (up or down), e.g. 160×100, 80×100, 640×400. */
+        static boolean isWholeNumberScale(int w, int h) {
+            for (int bw : new int[]{W, W / 2}) {
+                if (w * H != h * bw) continue;                       // not the same proportions
+                if ((h >= H && h % H == 0) || (h < H && H % h == 0)) return true;
             }
-            // whole-number factor, square pixels or multicolor pixels (double width), e.g. 160×100 or 80×100
-            boolean integer = W % w == 0 && H % h == 0 && (W / w == H / h || W / w == 2 * (H / h));
-            if (integer) return new Settings(null, ScaleMode.STRETCH, Filter.NEAREST, Aspect.FREE, d.fill());
-            return new Settings(null, ScaleMode.FIT, Filter.BICUBIC, d.aspect(), d.fill());
+            return false;
         }
 
         /** 1:1 frame of 320×200 source pixels, centered. */

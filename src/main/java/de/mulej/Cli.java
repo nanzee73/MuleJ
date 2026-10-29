@@ -57,6 +57,7 @@ public final class Cli {
               --bg auto|0..15         koala: background colour (default: most common colour)
               --fix-clashes           koala/hires: correct cells with too many colours instead of failing
               --preview FILE.png      koala/hires: also write the result as PNG
+              --prg FILE.prg          koala/hires: also write a runnable C64 program that shows the picture
               -h, --help              this help
             """;
 
@@ -81,7 +82,7 @@ public final class Cli {
         int bg = -1, strength = 80;
         Dither dither = Dither.NONE;
         ImageFitter.ScaleMode fit = null;
-        Path in = null, out = null, preview = null;
+        Path in = null, out = null, preview = null, prg = null;
         try {
             for (int i = 1; i < args.length; i++) {
                 String a = args[i];
@@ -107,6 +108,7 @@ public final class Cli {
                     case "--serpentine" -> serpentine = true;
                     case "--no-bleeding" -> bleeding = false;
                     case "--preview" -> preview = Path.of(next(args, ++i));
+                    case "--prg" -> prg = Path.of(next(args, ++i));
                     default -> {
                         if (a.startsWith("-")) throw new IllegalArgumentException("Unknown option: " + a);
                         if (in == null) in = Path.of(a);
@@ -182,6 +184,10 @@ public final class Cli {
                     if (!r.fixedCells().isEmpty())
                         System.out.println("Corrected colours in " + r.fixedCells().size() + " cells.");
                     if (preview != null) Images.writePng(r.render(pal), preview);
+                    if (prg != null) {
+                        Files.write(prg, ViewerPrg.build(r));
+                        System.out.println("Wrote " + prg + " (LOAD\"NAME\",8 and RUN on the C64)");
+                    }
                     System.out.println("Conversion of " + in + " successful: " + target
                             + (mode.sharedBackground ? " (background " + r.background() + ")" : ""));
                 }

@@ -10,19 +10,22 @@ default settings it produces the same results as the old tools.
 | Tool | What it does | Output |
 |---|---|---|
 | **Palettize** | Replaces every colour by the nearest colour of a C64 palette, optionally dithered. Any picture size, or brought to 320×200. | `NAME_palettized.png` |
-| **Pixelize 2×1** | Makes every two neighbouring pixels equal (multicolor pixels): left→right, right→left or average. | `NAME_pixelized_l2r.png`, `NAME_pixelized_r2l.png` (or `_avg`) |
+| **Pixelize 2×1** | Makes every two neighbouring pixels equal (multicolor pixels): left→right or right→left. | `NAME_pixelized_l2r.png` or `NAME_pixelized_r2l.png` |
 | **C64 bitmap – multicolor** | 160×200, per 4×8 cell 3 colours plus one background colour for the whole picture. | `NAME.kla` (Koala Painter, 10003 bytes, `$6000`) |
 | **C64 bitmap – hires** | 320×200, per 8×8 cell 2 colours. | `NAME.art` (OCP Art Studio, 9009 bytes, `$2000`) |
 
 ### Bringing pictures to 320×200
 
-*Bring to 320×200* (always on for C64 bitmaps) opens the crop & scale dialog for every picture that is not 320×200 or 160×200:
+*Bring to 320×200* (always on for C64 bitmaps) opens the crop & scale dialog for every picture that is not 320×200 or 160×200.
+The dialog always starts with the **largest centered frame in the C64 aspect ratio** (PAL, ≈1.50:1, as on a real monitor):
 
-* **Larger pictures** start with the largest centered frame in the target aspect ratio; drag it, resize it at the corner or draw a new one.
+* **Larger pictures** are scaled down into that frame; drag it, resize it at the corner or draw a new one.
 * **320×200 frame (1:1)** – a frame of exactly 320×200 picture pixels without any scaling; it can only be moved
   (a click puts it where you clicked). Pictures smaller than 320×200 get the border colour around them.
-* **Smaller pictures** are scaled up. Pictures that fit 320×200 by a whole-number factor (e.g. 160×100, 80×100)
-  are enlarged exactly with nearest neighbour, so pixel art stays crisp; others are scaled smoothly.
+* **Smaller pictures** are scaled up along their shorter side, so the C64 frame is filled completely (no border).
+  Pictures that fit 320×200 or 160×200 by a whole-number factor (e.g. 160×100, 80×100, 640×400)
+  are taken completely and scaled exactly with nearest neighbour, so pixel art stays crisp.
+* **Mouse wheel** zooms into the picture (around the mouse pointer), right or middle drag pans, double click shows the whole picture.
 * Scaling modes stretch / fit (letterbox) / fill (crop), aspect PAL / square pixels / NTSC / free, four filters, border colour.
 * A right click into the original preview chooses the frame directly in the preview (the 1:1 frame keeps its size).
 
@@ -56,6 +59,10 @@ Every result is checked against the rules of the mode. Only a picture that passe
   custom palettes via the colour editor or `.vpl`/`.gpl`/hex files.
 * Colour matching in plain euclidean RGB (default, as before), luma-weighted RGB, YUV or HSL.
 * Previews: zoom with the mouse wheel, pan with the right mouse button, linked previews, pixel and 8×8 cell grid.
+* **Result as PNG…** saves the right preview, **Result as PRG…** a runnable C64 program that shows the picture
+  (C64 bitmap tool, once the colour check has passed: `LOAD"NAME",8` and `RUN`, any key returns to BASIC).
+  Both start in the folder of the source picture.
+* Until a picture is opened, everything except opening a picture, the tool choice and the menus is locked.
 * English and German user interface (*Language* menu, English by default, no restart needed).
 
 ## Command line
@@ -67,7 +74,7 @@ mulej palettize image.png                       # -> image_palettized.png
 mulej palettize photo.jpg --fit fill --dither fs
 mulej pixelize image.png                        # -> image_pixelized_l2r.png + image_pixelized_r2l.png
 mulej koala image.png                           # -> image.kla
-mulej koala photo.jpg --fit fill --pair avg --space yuv --dither fs --preview check.png
+mulej koala photo.jpg --fit fill --space yuv --dither fs --preview check.png --prg photo.prg
 mulej hires image.png --fix-clashes             # -> image.art
 mulej check pixelart.png --mode hires --no-palettize   # list every cell that breaks the rules
 mulej topng image.kla                           # -> image.png
@@ -76,6 +83,21 @@ mulej --help
 ```
 
 Exit codes as before: 0 = OK, 1 = wrong parameters, 2 = conversion error (`check`: 2 = rules broken).
+The command line still offers `avg` (average of a pixel pair) for `--dir` and `--pair`; the GUI only offers left→right and right→left.
+
+### PRG memory map
+
+| Address | Content |
+|---|---|
+| `$0801` | BASIC line `10 SYS2061` |
+| `$080D` | viewer code (sets VIC bank 0, bitmap mode, copies colour RAM, waits for a key, restores the text screen) |
+| `$0C00–$0FE7` | screen RAM (the VIC reads it there directly) |
+| `$1000–$13E7` | colour RAM data (multicolor), copied to `$D800` |
+| `$13E8` / `$13E9` | background / border colour |
+| `$2000–$3F3F` | bitmap |
+
+The viewer was checked in a 6502 simulator (the picture the VIC would show is identical to the `.kla`/`.art` data),
+not yet in VICE or on real hardware.
 
 ## Using MuleJ (for users)
 

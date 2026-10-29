@@ -274,4 +274,51 @@ class CoreTest {
         assertEquals(ImageFitter.ScaleMode.FILL, bigSug.mode());
         assertEquals(1600, bigSug.crop().width);
     }
+
+    @Test
+    void viewerPrgContainsThePictureAtTheVicAddresses() throws Exception {
+        int[] idx = randomValid(C64Mode.MULTICOLOR, 11, 6);
+        BitmapConverter.Result r = BitmapConverter.convert(wide(C64Mode.MULTICOLOR, idx, COLODORE), exact(C64Mode.MULTICOLOR, 6));
+        byte[] prg = ViewerPrg.build(r);
+        assertEquals(0x01, prg[0]);
+        assertEquals(0x08, prg[1]);
+        // 10 SYS2061
+        assertArrayEquals(new byte[]{0x0B, 0x08, 0x0A, 0x00, (byte) 0x9E, '2', '0', '6', '1', 0}, java.util.Arrays.copyOfRange(prg, 2, 12));
+        KoalaImage k = r.koala();
+        assertArrayEquals(k.screen, java.util.Arrays.copyOfRange(prg, at(0x0C00), at(0x0C00) + 1000));
+        assertArrayEquals(k.colorRam, java.util.Arrays.copyOfRange(prg, at(0x1000), at(0x1000) + 1000));
+        assertEquals(6, prg[at(0x13E8)]);
+        assertArrayEquals(k.bitmap, java.util.Arrays.copyOfRange(prg, at(0x2000), at(0x2000) + 8000));
+        assertEquals(at(0x3F40), prg.length);
+
+        BitmapConverter.Result h = BitmapConverter.convert(wide(C64Mode.HIRES, randomValid(C64Mode.HIRES, 12, -1), COLODORE),
+                exact(C64Mode.HIRES, -1));
+        byte[] hp = ViewerPrg.build(h);
+        assertArrayEquals(h.hires().bitmap, java.util.Arrays.copyOfRange(hp, at(0x2000), at(0x2000) + 8000));
+        // a picture that breaks the rules gives no program
+        BitmapConverter.Result bad = BitmapConverter.convert(wide(C64Mode.MULTICOLOR, withClash(), COLODORE), exact(C64Mode.MULTICOLOR, 0));
+        assertThrows(IllegalArgumentException.class, () -> ViewerPrg.build(bad));
+    }
+
+    /** File offset of a C64 address in a program loaded at $0801. */
+    private static int at(int address) { return address - 0x0801 + 2; }
+
+    @Test
+    void importFrameUsesTheC64AspectRatio() {
+        double pal = ImageFitter.Aspect.PAL.ratio;
+        for (int[] size : new int[][]{{4000, 2252}, {2252, 4000}, {1024, 700}, {200, 150}, {100, 300}, {1000, 150}}) {
+            ImageFitter.Settings s = ImageFitter.Settings.suggested(new BufferedImage(size[0], size[1], BufferedImage.TYPE_INT_RGB));
+            assertEquals(ImageFitter.ScaleMode.FILL, s.mode());
+            Rectangle c = s.crop();
+            assertEquals(pal, (double) c.width / c.height, 0.02, size[0] + "x" + size[1]);
+            // largest frame: it touches the shorter side of the picture
+            assertTrue(c.width == size[0] || c.height == size[1]);
+        }
+        // small pictures are scaled up along the shorter side: no border
+        BufferedImage small = new BufferedImage(200, 150, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = small.createGraphics(); g.setColor(Color.WHITE); g.fillRect(0, 0, 200, 150); g.dispose();
+        BufferedImage up = ImageFitter.fit(small, ImageFitter.Settings.suggested(small));
+        for (int[] p : new int[][]{{0, 0}, {319, 0}, {0, 199}, {319, 199}, {160, 0}, {0, 100}})
+            assertEquals(0xFFFFFF, up.getRGB(p[0], p[1]) & 0xFFFFFF);
+    }
 }

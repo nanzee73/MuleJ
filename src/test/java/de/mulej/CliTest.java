@@ -37,6 +37,9 @@ class CliTest {
         assertEquals(320, ImageIO.read(dir.resolve("back.png").toFile()).getWidth());
         assertEquals(0, Cli.run(new String[]{"hires", in.toString(), "--dither", "fs"}));
         assertEquals(HiresImage.FILE_SIZE, Files.size(dir.resolve("pic.art")));
+        assertEquals(0, Cli.run(new String[]{"koala", in.toString(), "-o", dir.resolve("p.kla").toString(),
+                "--fix-clashes", "--prg", dir.resolve("p.prg").toString()}));
+        assertEquals(2 + 0x3F40 - 0x0801, Files.size(dir.resolve("p.prg")));
         assertEquals(0, Cli.run(new String[]{"check", dir.resolve("pic.kla").toString(), "--no-palettize"}));
         assertEquals(0, Cli.run(new String[]{"check", dir.resolve("pic.art").toString(), "--mode", "hires", "--no-palettize"}));
         Path noise = dir.resolve("noise.png");

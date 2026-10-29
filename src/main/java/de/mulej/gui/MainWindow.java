@@ -52,8 +52,7 @@ public class MainWindow extends JFrame {
     private final JComboBox<ColorMatcher.Space> spaceBox = new JComboBox<>(ColorMatcher.Space.values());
 
     // pixel pairs
-    private final JRadioButton pairL2R = new JRadioButton("", true), pairR2L = new JRadioButton(), pairAvg = new JRadioButton();
-    private final JCheckBox bothDirections = I18n.tip(I18n.text(new JCheckBox("", true), "pix.both"), "pix.both.tip");
+    private final JRadioButton pairL2R = new JRadioButton("", true), pairR2L = new JRadioButton();
 
     // dithering
     private final JComboBox<Dither> ditherBox = new JComboBox<>(Dither.values());
@@ -94,6 +93,10 @@ public class MainWindow extends JFrame {
 
     private final JButton cropButton = I18n.tip(I18n.text(new JButton(), "bottom.crop"), "bottom.crop.tip");
     private final JButton runButton = I18n.tip(I18n.text(new JButton(), "bottom.run"), "bottom.run.tip");
+    private final JButton savePngButton = I18n.tip(I18n.text(new JButton(), "bottom.savePng"), "bottom.savePng.tip");
+    private final JButton savePrgButton = I18n.text(new JButton(), "bottom.savePrg");
+    /** Everything that only makes sense with a picture: locked until one is opened. */
+    private final List<Component> needPicture = new ArrayList<>();
     private final JProgressBar progress = new JProgressBar();
     private final JLabel status = new JLabel(" ");
     private Supplier<String> statusText = () -> " ";
@@ -114,8 +117,7 @@ public class MainWindow extends JFrame {
     private final javax.swing.Timer fitTimer = new javax.swing.Timer(120, e -> applyFit());
 
     /** Outcome of one computation (always for one tool). */
-    private record Computed(Tool tool, BufferedImage image, BufferedImage second,
-                            BitmapConverter.Result bitmap, String error) {}
+    private record Computed(Tool tool, BufferedImage image, BitmapConverter.Result bitmap, String error) {}
 
     public MainWindow() {
         I18n.bind(() -> setTitle(tr("app.title", App.VERSION)));
@@ -204,6 +206,7 @@ public class MainWindow extends JFrame {
         JMenuItem reframe = I18n.text(new JMenuItem(), "menu.file.reframe");
         reframe.addActionListener(e -> startReframe());
         JMenuItem exit = I18n.text(new JMenuItem(), "menu.file.exit");
+        needPicture.addAll(List.of(crop, reframe));
         exit.addActionListener(e -> dispose());
         file.add(open);
         file.add(crop);
@@ -277,6 +280,7 @@ public class MainWindow extends JFrame {
         c.gridy = 2; c.gridx = 0; p.add(fixedLabel("file.output"), c);
         c.gridx = 1; c.weightx = 1; p.add(outputField, c);
         c.gridx = 2; c.weightx = 0; p.add(selOut, c);
+        needPicture.addAll(List.of(outputField, selOut, toC64Size));
         return p;
     }
 
@@ -315,18 +319,14 @@ public class MainWindow extends JFrame {
         JPanel p = pixelPanel = group("pix.group");
         GridBagConstraints c = gbc();
         ButtonGroup g = new ButtonGroup();
-        g.add(pairL2R); g.add(pairR2L); g.add(pairAvg);
+        g.add(pairL2R); g.add(pairR2L);
         I18n.tip(I18n.text(pairL2R, "pixel.L2R"), "pixel.L2R.tip");
         I18n.tip(I18n.text(pairR2L, "pixel.R2L"), "pixel.R2L.tip");
-        I18n.tip(I18n.text(pairAvg, "pixel.AVERAGE"), "pixel.AVERAGE.tip");
         c.gridx = 0;
         c.gridy = 0; p.add(pairL2R, c);
         c.gridy = 1; p.add(pairR2L, c);
-        c.gridy = 2; p.add(pairAvg, c);
-        c.gridy = 3; p.add(bothDirections, c);
         addDefaultButton(p, () -> {
             pairL2R.setSelected(true);
-            bothDirections.setSelected(true);
             settingsChanged();
             updateOutputPath();
         });
@@ -533,6 +533,7 @@ public class MainWindow extends JFrame {
             tools.add(showGrid);
         }
         header.add(tools, BorderLayout.CENTER);
+        needPicture.add(tools);
         box.add(header, BorderLayout.NORTH);
         box.add(panel, BorderLayout.CENTER);
         return box;
@@ -556,12 +557,13 @@ public class MainWindow extends JFrame {
     private JPanel buildBottomPanel() {
         JPanel p = new JPanel(new BorderLayout(6, 0));
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton savePng = I18n.tip(I18n.text(new JButton(), "bottom.savePng"), "bottom.savePng.tip");
         cropButton.addActionListener(e -> openCropDialog());
-        savePng.addActionListener(e -> saveResultPng());
+        savePngButton.addActionListener(e -> saveResultPng());
+        savePrgButton.addActionListener(e -> saveResultPrg());
         runButton.addActionListener(e -> run());
         buttons.add(cropButton);
-        buttons.add(savePng);
+        buttons.add(savePngButton);
+        buttons.add(savePrgButton);
         buttons.add(runButton);
         progress.setIndeterminate(true);
         progress.setPreferredSize(new Dimension(80, progress.getPreferredSize().height));
@@ -594,10 +596,10 @@ public class MainWindow extends JFrame {
             updateCellPanel();
         });
         spaceBox.addActionListener(e -> settingsChanged());
-        for (AbstractButton b : new AbstractButton[]{pairL2R, pairR2L, pairAvg, bothDirections, bitmapPalettize,
+        for (AbstractButton b : new AbstractButton[]{pairL2R, pairR2L, bitmapPalettize,
                 fixClashes, serpentine, bleeding})
             b.addActionListener(e -> settingsChanged());
-        for (AbstractButton b : new AbstractButton[]{pairL2R, pairR2L, pairAvg, bothDirections})
+        for (AbstractButton b : new AbstractButton[]{pairL2R, pairR2L})
             b.addActionListener(e -> updateOutputPath());
         modeMc.addActionListener(e -> modeChanged());
         modeHires.addActionListener(e -> modeChanged());
@@ -623,33 +625,39 @@ public class MainWindow extends JFrame {
     /** Enables what belongs to the current tool and settings. */
     private void updateEnabled() {
         Tool t = tool();
-        boolean bitmap = t == Tool.BITMAP;
-        setEnabledDeep(palettePanel, t != Tool.PIXELIZE);
-        setEnabledDeep(pixelPanel, t == Tool.PIXELIZE || (bitmap && mode() == C64Mode.MULTICOLOR));
-        bothDirections.setEnabled(t == Tool.PIXELIZE && !pairAvg.isSelected());
-        boolean ditherOk = t == Tool.PALETTIZE || (bitmap && bitmapPalettize.isSelected());
+        boolean has = source != null, bitmap = t == Tool.BITMAP;
+        setEnabledDeep(palettePanel, has && t != Tool.PIXELIZE);
+        setEnabledDeep(pixelPanel, has && (t == Tool.PIXELIZE || (bitmap && mode() == C64Mode.MULTICOLOR)));
+        boolean ditherOk = has && (t == Tool.PALETTIZE || (bitmap && bitmapPalettize.isSelected()));
         setEnabledDeep(ditherPanel, ditherOk);
         bleeding.setEnabled(ditherOk && bitmap);
-        setEnabledDeep(bitmapPanel, bitmap);
-        backgroundBox.setEnabled(bitmap && mode() == C64Mode.MULTICOLOR);
-        fixClashes.setEnabled(bitmap && !ditherActive());
-        toC64Size.setEnabled(!bitmap);
+        setEnabledDeep(bitmapPanel, has && bitmap);
+        backgroundBox.setEnabled(has && bitmap && mode() == C64Mode.MULTICOLOR);
+        fixClashes.setEnabled(has && bitmap && !ditherActive());
         toC64Size.setSelected(bitmap || toC64Size.isSelected());
         checkPanel.setVisible(bitmap);
-        paintColour.setEnabled(toolPaint.isSelected());
-        cropButton.setEnabled(source != null && usesFrame());
+        for (Component c : needPicture) setEnabledDeep(c, has);
+        setEnabledDeep(checkPanel, has && result != null && result.bitmap() != null);
+        toC64Size.setEnabled(has && !bitmap);
+        paintColour.setEnabled(has && toolPaint.isSelected());
+        cropButton.setEnabled(has && usesFrame());
+        boolean image = has && result != null && result.image() != null && result.tool() == t;
+        savePngButton.setEnabled(image);
+        runButton.setEnabled(has);
+        BitmapConverter.Result r = image ? result.bitmap() : null;
+        savePrgButton.setEnabled(r != null && r.ok());
+        savePrgButton.setToolTipText(tr(r != null && r.ok() ? "bottom.savePrg.tip" : "bottom.savePrg.off"));
+        if (has && checkPanel.isEnabled()) updateCellPanel();     // re-applies the per-button states
     }
 
     private boolean ditherActive() {
         return ditherBox.getSelectedItem() != Dither.NONE && strength.getValue() > 0;
     }
 
-    private static void setEnabledDeep(Container c, boolean on) {
+    private static void setEnabledDeep(Component c, boolean on) {
         c.setEnabled(on);
-        for (Component child : c.getComponents()) {
-            child.setEnabled(on);
-            if (child instanceof Container cc && !(child instanceof JComboBox)) setEnabledDeep(cc, on);
-        }
+        if (c instanceof JComboBox || c instanceof JMenuItem || !(c instanceof Container cc)) return;
+        for (Component child : cc.getComponents()) setEnabledDeep(child, on);
     }
 
     private boolean toolChangeRemembered;
@@ -736,7 +744,7 @@ public class MainWindow extends JFrame {
 
     private Pixelizer.Direction direction() {
         return pairR2L.isSelected() ? Pixelizer.Direction.R2L
-                : pairAvg.isSelected() ? Pixelizer.Direction.AVERAGE : Pixelizer.Direction.L2R;
+                : Pixelizer.Direction.L2R;
     }
 
     private Ditherer.Settings ditherSettings() {
@@ -765,7 +773,6 @@ public class MainWindow extends JFrame {
         Palette pal = palette();
         ColorMatcher.Space space = (ColorMatcher.Space) spaceBox.getSelectedItem();
         Pixelizer.Direction dir = direction();
-        boolean both = bothDirections.isSelected() && dir != Pixelizer.Direction.AVERAGE;
         Ditherer.Settings ds = ditherSettings();
         BitmapConverter.Settings bs = bitmapSettings();
         BitmapConverter.Edits edits = new BitmapConverter.Edits(Map.copyOf(cellEdits), Map.copyOf(pixelEdits));
@@ -776,19 +783,16 @@ public class MainWindow extends JFrame {
             @Override protected Computed doInBackground() {
                 switch (t) {
                     case PALETTIZE:
-                        return new Computed(t, Palettizer.palettize(in, pal, space, ds), null, null, null);
+                        return new Computed(t, Palettizer.palettize(in, pal, space, ds), null, null);
                     case PIXELIZE: {
-                        // "both directions": L2R in the output file, R2L next to it (like the old c64pixelizer)
-                        BufferedImage a = Pixelizer.pixelize(in, both ? Pixelizer.Direction.L2R : dir);
-                        BufferedImage b = both ? Pixelizer.pixelize(in, Pixelizer.Direction.R2L) : null;
-                        return new Computed(t, a, b, null, null);
+                        return new Computed(t, Pixelizer.pixelize(in, dir), null, null);
                     }
                     default:
                         try {
                             BitmapConverter.Result r = BitmapConverter.convert(in, bs, edits);
-                            return new Computed(t, r.render(pal), null, r, null);
+                            return new Computed(t, r.render(pal), r, null);
                         } catch (BitmapConverter.ConversionException e) {
-                            return new Computed(t, null, null, null, e.getMessage());
+                            return new Computed(t, null, null, e.getMessage());
                         }
                 }
             }
@@ -800,10 +804,10 @@ public class MainWindow extends JFrame {
                     result = get();
                 } catch (Exception ex) {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    result = new Computed(t, null, null, null, String.valueOf(cause.getMessage()));
+                    result = new Computed(t, null, null, String.valueOf(cause.getMessage()));
                 }
                 updateRight();
-                updateCellPanel();
+                updateEnabled();                  // PNG/PRG buttons and check panel follow the new result
                 reportResult(System.currentTimeMillis() - t0);
             }
         };
@@ -1070,8 +1074,7 @@ public class MainWindow extends JFrame {
         String base = inputFile.getName().replaceFirst("\\.[^.]+$", "");
         String name = switch (tool()) {
             case PALETTIZE -> base + "_palettized.png";
-            case PIXELIZE -> base + (bothDirections.isSelected() && !pairAvg.isSelected()
-                    ? Pixelizer.Direction.L2R : direction()).fileSuffix() + ".png";
+            case PIXELIZE -> base + direction().fileSuffix() + ".png";
             case BITMAP -> base + "." + mode().extension;
         };
         File dir = outputDirChosen != null ? outputDirChosen : inputFile.getAbsoluteFile().getParentFile();
@@ -1213,11 +1216,6 @@ public class MainWindow extends JFrame {
                 case PIXELIZE -> {
                     Images.writePng(result.image(), target);
                     written.add(target.getFileName().toString());
-                    if (result.second() != null) {
-                        Path second = r2lSibling(target);
-                        Images.writePng(result.second(), second);
-                        written.add(second.getFileName().toString());
-                    }
                 }
                 case BITMAP -> {
                     BitmapConverter.Result r = result.bitmap();
@@ -1235,27 +1233,46 @@ public class MainWindow extends JFrame {
         }
     }
 
-    /** "x_pixelized_l2r.png" → "x_pixelized_r2l.png"; other names get "_r2l" appended. */
-    static Path r2lSibling(Path p) {
-        String name = p.getFileName().toString();
-        String n = name.contains("_l2r") ? name.replace("_l2r", "_r2l") : name.replaceFirst("(\\.[^.]+)?$", "_r2l$1");
-        return p.toAbsolutePath().resolveSibling(n);
+    /** Folder of the source picture – where "Result as PNG/PRG" start. */
+    private File sourceDir() { return inputFile != null ? inputFile.getAbsoluteFile().getParentFile() : null; }
+
+    private String sourceBase() {
+        return inputFile != null ? inputFile.getName().replaceFirst("\\.[^.]+$", "") : "result";
+    }
+
+    /** Save dialog in the folder of the source picture; returns the path with extension, or null. */
+    private Path chooseResultFile(String titleKey, String filterKey, String ext, String defaultName) {
+        File dir = sourceDir();
+        JFileChooser fc = FileDialogs.chooser(titleKey, dir);
+        FileDialogs.addFilter(fc, filterKey, ext);
+        fc.setSelectedFile(new File(dir, defaultName));
+        if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return null;
+        String s = fc.getSelectedFile().getPath();
+        return Path.of(s.toLowerCase(Locale.ROOT).endsWith("." + ext) ? s : s + "." + ext);
     }
 
     private void saveResultPng() {
         if (result == null || result.image() == null) return;
-        File dir = FileDialogs.lastDir("png");
-        JFileChooser fc = FileDialogs.chooser("dlg.savePng.title", dir);
-        FileDialogs.addFilter(fc, "filter.png", "png");
-        String base = inputFile != null ? inputFile.getName().replaceFirst("\\.[^.]+$", "") : "result";
-        fc.setSelectedFile(new File(dir, base + "_" + tool().name().toLowerCase(Locale.ROOT) + ".png"));
-        if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
-        FileDialogs.rememberDir("png", fc.getSelectedFile());
-        String s = fc.getSelectedFile().getPath();
-        Path p = Path.of(s.toLowerCase(Locale.ROOT).endsWith(".png") ? s : s + ".png");
+        Path p = chooseResultFile("dlg.savePng.title", "filter.png", "png",
+                sourceBase() + "_" + tool().name().toLowerCase(Locale.ROOT) + ".png");
+        if (p == null) return;
         try {
             Images.writePng(result.image(), p);   // without cell markers
             setStatus("status.saved", p.getFileName());
+        } catch (Exception ex) {
+            error(tr("err.write", ex.getMessage()));
+        }
+    }
+
+    /** Runnable C64 program that shows the picture (C64 bitmap tool, colour check passed). */
+    private void saveResultPrg() {
+        BitmapConverter.Result r = result != null ? result.bitmap() : null;
+        if (r == null || !r.ok()) return;
+        Path p = chooseResultFile("dlg.savePrg.title", "filter.prg", "prg", sourceBase() + ".prg");
+        if (p == null) return;
+        try {
+            Files.write(p, ViewerPrg.build(r));
+            setStatus("status.savedPrg", p.getFileName());
         } catch (Exception ex) {
             error(tr("err.write", ex.getMessage()));
         }

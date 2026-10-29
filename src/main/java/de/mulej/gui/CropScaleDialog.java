@@ -203,10 +203,31 @@ public class CropScaleDialog extends JDialog {
         private Point dragStart;
         private Rectangle dragOrig;
         private int dragMode; // 0 none, 1 move, 2 resize, 3 new
+        /** Zoom relative to "whole picture visible" (1 .. 32). */
+        private double zoom = 1;
+        /** Picture point (pixels) in the middle of the view while zoomed in. */
+        private double centerX, centerY;
+        private Point panLast;
 
         CropView() {
             MouseAdapter ma = new MouseAdapter() {
+                @Override public void mouseWheelMoved(java.awt.event.MouseWheelEvent e) {
+                    zoomAt(zoom * Math.pow(1.25, -e.getPreciseWheelRotation()), e.getPoint());
+                }
+
+                @Override public void mouseClicked(MouseEvent e) {
+                    if (SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 2) {
+                        zoom = 1;
+                        repaint();
+                    }
+                }
+
                 @Override public void mousePressed(MouseEvent e) {
+                    if (!SwingUtilities.isLeftMouseButton(e)) {          // right / middle button: pan the view
+                        panLast = e.getPoint();
+                        setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                        return;
+                    }
                     Point p = toImage(e.getPoint());
                     dragStart = p;
                     dragOrig = new Rectangle(crop);
@@ -225,6 +246,15 @@ public class CropScaleDialog extends JDialog {
                 }
 
                 @Override public void mouseDragged(MouseEvent e) {
+                    if (panLast != null) {
+                        double sc = scale();
+                        centerX -= (e.getX() - panLast.x) / sc;
+                        centerY -= (e.getY() - panLast.y) / sc;
+                        panLast = e.getPoint();
+                        clampCenter();
+                        repaint();
+                        return;
+                    }
                     if (dragStart == null) return;
                     Point p = toImage(e.getPoint());
                     int dx = p.x - dragStart.x, dy = p.y - dragStart.y;
@@ -239,10 +269,41 @@ public class CropScaleDialog extends JDialog {
                     refresh();
                 }
 
-                @Override public void mouseReleased(MouseEvent e) { dragStart = null; dragMode = 0; }
+                @Override public void mouseReleased(MouseEvent e) {
+                    dragStart = null;
+                    dragMode = 0;
+                    panLast = null;
+                    setCursor(Cursor.getDefaultCursor());
+                }
             };
             addMouseListener(ma);
             addMouseMotionListener(ma);
+            addMouseWheelListener(ma);
+        }
+
+        /** Zooms so the picture point under the mouse stays where it is. */
+        private void zoomAt(double newZoom, Point mouse) {
+            newZoom = Math.max(1, Math.min(32, newZoom));
+            if (newZoom == zoom) return;
+            double px = toImageX(mouse.x), py = toImageY(mouse.y);
+            if (zoom == 1) {
+                Rectangle b = shownArea();
+                centerX = b.getCenterX();
+                centerY = b.getCenterY();
+            }
+            zoom = newZoom;
+            double sc = scale();
+            centerX = px - (mouse.x - getWidth() / 2.0) / sc;
+            centerY = py - (mouse.y - getHeight() / 2.0) / sc;
+            clampCenter();
+            repaint();
+        }
+
+        private void clampCenter() {
+            Rectangle b = shownArea();
+            double sc = scale(), halfW = getWidth() / 2.0 / sc, halfH = getHeight() / 2.0 / sc;
+            centerX = b.width <= 2 * halfW ? b.getCenterX() : Math.max(b.x + halfW, Math.min(b.x + b.width - halfW, centerX));
+            centerY = b.height <= 2 * halfH ? b.getCenterY() : Math.max(b.y + halfH, Math.min(b.y + b.height - halfH, centerY));
         }
 
         private Rectangle sized(int x, int y, int w, int h) {
@@ -261,20 +322,25 @@ public class CropScaleDialog extends JDialog {
 
         private double scale() {
             Rectangle b = shownArea();
-            return Math.min((double) getWidth() / b.width, (double) getHeight() / b.height);
+            return zoom * Math.min((double) getWidth() / b.width, (double) getHeight() / b.height);
         }
 
         /** Screen position of picture pixel (0,0). */
         private Point offset() {
             double s = scale();
             Rectangle b = shownArea();
-            return new Point((int) ((getWidth() - b.width * s) / 2 - b.x * s), (int) ((getHeight() - b.height * s) / 2 - b.y * s));
+            double cx = zoom == 1 ? b.getCenterX() : centerX, cy = zoom == 1 ? b.getCenterY() : centerY;
+            return new Point((int) Math.round(getWidth() / 2.0 - cx * s), (int) Math.round(getHeight() / 2.0 - cy * s));
         }
+
+        private double toImageX(int x) { return (x - offset().x) / scale(); }
+
+        private double toImageY(int y) { return (y - offset().y) / scale(); }
 
         private Point toImage(Point p) {
             double s = scale();
             Point o = offset();
-            return new Point((int) ((p.x - o.x) / s), (int) ((p.y - o.y) / s));
+            return new Point((int) Math.floor((p.x - o.x) / s), (int) Math.floor((p.y - o.y) / s));
         }
 
         @Override protected void paintComponent(Graphics g) {
@@ -283,7 +349,9 @@ public class CropScaleDialog extends JDialog {
             g2.fillRect(0, 0, getWidth(), getHeight());
             double s = scale();
             Point o = offset();
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            // zoomed in far: show crisp pixels
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, s >= 2 ? RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+                    : RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             if (fixed()) {
                 // border colour where the 1:1 frame is larger than the picture
                 g2.setColor(fill);
