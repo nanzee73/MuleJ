@@ -1,5 +1,6 @@
 package de.mulej;
 
+import de.mulej.core.HiresImage;
 import de.mulej.core.KoalaImage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,6 +35,19 @@ class CliTest {
         assertEquals(KoalaImage.FILE_SIZE, Files.size(dir.resolve("pic.kla")));
         assertEquals(0, Cli.run(new String[]{"topng", dir.resolve("pic.kla").toString(), dir.resolve("back.png").toString()}));
         assertEquals(320, ImageIO.read(dir.resolve("back.png").toFile()).getWidth());
+        assertEquals(0, Cli.run(new String[]{"hires", in.toString(), "--dither", "fs"}));
+        assertEquals(HiresImage.FILE_SIZE, Files.size(dir.resolve("pic.art")));
+        assertEquals(0, Cli.run(new String[]{"check", dir.resolve("pic.kla").toString(), "--no-palettize"}));
+        assertEquals(0, Cli.run(new String[]{"check", dir.resolve("pic.art").toString(), "--mode", "hires", "--no-palettize"}));
+        Path noise = dir.resolve("noise.png");
+        BufferedImage n = new BufferedImage(320, 200, BufferedImage.TYPE_INT_RGB);
+        java.util.Random r = new java.util.Random(1);
+        for (int y = 0; y < 200; y++) for (int x = 0; x < 320; x++) n.setRGB(x, y, r.nextInt(0x1000000));
+        ImageIO.write(n, "png", noise.toFile());
+        assertEquals(2, Cli.run(new String[]{"check", noise.toString()}));               // noise breaks the rules
+        assertEquals(0, Cli.run(new String[]{"check", in.toString()}));                  // a smooth gradient does not
+        assertEquals(0, Cli.run(new String[]{"palettize", in.toString(), "-o", dir.resolve("d.png").toString(),
+                "--dither", "atkinson", "--strength", "60"}));
     }
 
     @Test
@@ -44,6 +58,9 @@ class CliTest {
         Path big = picture(640, 400);
         assertEquals(2, Cli.run(new String[]{"koala", big.toString()}));                // wrong size
         assertEquals(0, Cli.run(new String[]{"koala", big.toString(), "--fit", "fill", "--fix-clashes"}));
+        assertEquals(0, Cli.run(new String[]{"koala", big.toString(), "-o", dir.resolve("one.kla").toString(),
+                "--fit", "none", "--dither", "bayer4"}));
+        assertEquals(1, Cli.run(new String[]{"koala", big.toString(), "--dither", "plaid"}));
         assertEquals(2, Cli.run(new String[]{"palettize", dir.resolve("missing.png").toString()}));
     }
 }

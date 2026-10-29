@@ -13,15 +13,24 @@ public final class Images {
     private Images() {}
 
     /**
-     * Reads a picture. Koala files (.kla/.koa) are rendered with the given palette,
+     * Reads a picture. Koala (.kla/.koa) and Art Studio (.art) files are drawn with the given palette,
      * everything else goes through ImageIO.
      */
     public static BufferedImage read(Path file, de.mulej.palette.Palette koalaPalette) throws IOException {
         if (isKoala(file)) return KoalaImage.read(Files.readAllBytes(file)).render(koalaPalette);
+        if (isArtStudio(file)) return HiresImage.read(Files.readAllBytes(file)).render(koalaPalette);
         BufferedImage img = ImageIO.read(file.toFile());
         if (img == null) throw new IOException(file.getFileName() + " is no readable image file.");
         return toRgb(img);
     }
+
+    public static boolean isArtStudio(Path file) {
+        String n = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        return n.endsWith(".art") || n.endsWith(".aas") || n.endsWith(".hpi");
+    }
+
+    /** A C64 bitmap file MuleJ can read (Koala or Art Studio); it is drawn with the selected palette. */
+    public static boolean isC64File(Path file) { return isKoala(file) || isArtStudio(file); }
 
     public static boolean isKoala(Path file) {
         String n = file.getFileName().toString().toLowerCase(Locale.ROOT);

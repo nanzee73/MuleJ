@@ -15,21 +15,24 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.function.Supplier;
 
 import static de.mulej.i18n.I18n.tr;
 
 /**
- * Main window, built like FlipperJ: tool and files on top, settings groups, previews (original / result) below.
- * The result is recomputed automatically after every change; "Run" writes the files.
+ * Main window, built like FlipperJ: tool and files on top, settings groups, colour check & correction,
+ * previews (original / result) below. The result is recomputed automatically after every change;
+ * "Save" writes the files.
  */
 public class MainWindow extends JFrame {
 
-    /** The three former command line tools. */
-    enum Tool { PALETTIZE, PIXELIZE, KOALA }
+    /** The former command line tools; BITMAP covers c64koalaverter (multicolor) and hires. */
+    enum Tool { PALETTIZE, PIXELIZE, BITMAP }
+
+    /** What a left click into the result does while the bitmap tool is active. */
+    private enum EditTool { SELECT, PAINT }
 
     private static final double PAL_PIXEL = 0.9365;
 
@@ -39,6 +42,7 @@ public class MainWindow extends JFrame {
     // files
     private final JTextField inputField = new JTextField();
     private final JTextField outputField = new JTextField();
+    private final JCheckBox toC64Size = I18n.tip(I18n.text(new JCheckBox("", true), "file.toC64"), "file.toC64.tip");
     /** Output folder chosen by the user; null = next to the input picture. */
     private File outputDirChosen;
 
@@ -51,12 +55,36 @@ public class MainWindow extends JFrame {
     private final JRadioButton pairL2R = new JRadioButton("", true), pairR2L = new JRadioButton(), pairAvg = new JRadioButton();
     private final JCheckBox bothDirections = I18n.tip(I18n.text(new JCheckBox("", true), "pix.both"), "pix.both.tip");
 
-    // koala
-    private final JCheckBox koalaPalettize = I18n.tip(I18n.text(new JCheckBox("", true), "kla.palettize"), "kla.palettize.tip");
+    // dithering
+    private final JComboBox<Dither> ditherBox = new JComboBox<>(Dither.values());
+    private final JSlider strength = new JSlider(0, 100, 80);
+    private final JCheckBox serpentine = I18n.text(new JCheckBox(), "dit.serpentine");
+    private final JCheckBox bleeding = I18n.tip(I18n.text(new JCheckBox("", true), "dit.bleeding"), "dit.bleeding.tip");
+
+    // C64 bitmap
+    private final JRadioButton modeMc = new JRadioButton("", true), modeHires = new JRadioButton();
+    private final JCheckBox bitmapPalettize = I18n.tip(I18n.text(new JCheckBox("", true), "bmp.palettize"), "bmp.palettize.tip");
     private final JComboBox<Integer> backgroundBox = new JComboBox<>();
-    private final JCheckBox fixClashes = I18n.tip(I18n.text(new JCheckBox(), "kla.fix"), "kla.fix.tip");
-    private final JCheckBox markClashes = I18n.tip(I18n.text(new JCheckBox("", true), "kla.mark"), "kla.mark.tip");
+    private final JCheckBox fixClashes = I18n.tip(I18n.text(new JCheckBox(), "bmp.fix"), "bmp.fix.tip");
     private final JCheckBox palAspect = I18n.text(new JCheckBox("", true), "view.palAspect");
+
+    // colour check & correction
+    private JPanel checkPanel;
+    private final JLabel checkLabel = new JLabel(" ");
+    private final JCheckBox markCells = I18n.tip(I18n.text(new JCheckBox("", true), "chk.mark"), "chk.mark.tip");
+    private final JRadioButton toolSelect = I18n.tip(I18n.text(new JRadioButton("", true), "chk.select"), "chk.select.tip");
+    private final JRadioButton toolPaint = I18n.tip(I18n.text(new JRadioButton(), "chk.paint"), "chk.paint.tip");
+    private final JComboBox<Integer> paintColour = new JComboBox<>();
+    private final JLabel cellLabel = new JLabel();
+    private final JToggleButton[] swatches = new JToggleButton[16];
+    private final JLabel cellHint = new JLabel(" ");
+    private final JButton applyCell = I18n.tip(I18n.text(new JButton(), "chk.apply"), "chk.apply.tip");
+    private final JButton autoCell = I18n.tip(I18n.text(new JButton(), "chk.auto"), "chk.auto.tip");
+    private final JButton resetCell = I18n.tip(I18n.text(new JButton(), "chk.resetCell"), "chk.resetCell.tip");
+    private final JButton resetAll = I18n.tip(I18n.text(new JButton(), "chk.resetAll"), "chk.resetAll.tip");
+    private final Map<Integer, int[]> cellEdits = new HashMap<>();
+    private final Map<Integer, Integer> pixelEdits = new HashMap<>();
+    private int selectedCell = -1;
 
     // previews
     private final ImagePanel leftPanel = new ImagePanel(), rightPanel = new ImagePanel();
@@ -64,29 +92,30 @@ public class MainWindow extends JFrame {
     private final JCheckBox linkViews = I18n.tip(I18n.text(new JCheckBox("", true), "view.link"), "view.link.tip");
     private final JCheckBox showGrid = I18n.tip(I18n.text(new JCheckBox("", true), "view.grid"), "view.grid.tip");
 
-    private final JButton cropButton = I18n.text(new JButton(), "bottom.crop");
+    private final JButton cropButton = I18n.tip(I18n.text(new JButton(), "bottom.crop"), "bottom.crop.tip");
     private final JButton runButton = I18n.tip(I18n.text(new JButton(), "bottom.run"), "bottom.run.tip");
     private final JProgressBar progress = new JProgressBar();
     private final JLabel status = new JLabel(" ");
-    /** Produces the current status text, so it can be re-translated after a language switch. */
     private Supplier<String> statusText = () -> " ";
+    private Supplier<String> checkText = () -> " ";
 
     // state
     private File inputFile;
     private BufferedImage source;
-    /** Crop & scale for the Koala tool; null = not chosen yet (only needed for pictures that are not C64-sized). */
+    /** Crop & scale to 320×200; null = not chosen (picture used as it is). */
     private ImageFitter.Settings fitSettings;
     private ImageFitter.Settings reframeBackup;
-    private BufferedImage koalaInput;
+    /** {@link #source} brought to 320×200 with {@link #fitSettings}. */
+    private BufferedImage fitted;
     private Computed result;
     private long generation;
     private SwingWorker<Computed, Void> worker;
-    private final Timer updateTimer = new Timer(150, e -> recompute());
-    private final Timer fitTimer = new Timer(120, e -> applyFit());
+    private final javax.swing.Timer updateTimer = new javax.swing.Timer(150, e -> recompute());
+    private final javax.swing.Timer fitTimer = new javax.swing.Timer(120, e -> applyFit());
 
     /** Outcome of one computation (always for one tool). */
     private record Computed(Tool tool, BufferedImage image, BufferedImage second,
-                            KoalaConverter.Result koala, String error) {}
+                            BitmapConverter.Result bitmap, String error) {}
 
     public MainWindow() {
         I18n.bind(() -> setTitle(tr("app.title", App.VERSION)));
@@ -94,12 +123,15 @@ public class MainWindow extends JFrame {
         setIconImages(Icons.appIcons());
         for (Palette p : Palettes.builtIns()) paletteModel.addElement(p);
         paletteBox.setSelectedItem(Palettes.COLODORE);
-        spaceBox.setRenderer(translatedRenderer(v -> tr("space." + ((ColorMatcher.Space) v).name())));
+        spaceBox.setRenderer(renderer(v -> tr("space." + ((ColorMatcher.Space) v).name()), null));
         for (int i = -1; i < 16; i++) backgroundBox.addItem(i);
-        backgroundBox.setRenderer(translatedRenderer(v -> {
+        backgroundBox.setRenderer(renderer(v -> {
             int i = (Integer) v;
-            return i < 0 ? tr("kla.bgAuto") : i + " " + tr("color." + i);
-        }));
+            return i < 0 ? tr("bmp.bgAuto") : i + " " + tr("color." + i);
+        }, v -> (Integer) v));
+        for (int i = 0; i < 16; i++) paintColour.addItem(i);
+        paintColour.setRenderer(renderer(v -> v + " " + tr("color." + v), v -> (Integer) v));
+        ditherBox.setSelectedItem(Dither.NONE);
         updateTimer.setRepeats(false);
         fitTimer.setRepeats(false);
 
@@ -111,6 +143,7 @@ public class MainWindow extends JFrame {
         north.add(buildToolPanel());
         north.add(buildFilePanel());
         north.add(buildSettingsPanel());
+        north.add(buildCheckPanel());
         root.add(north, BorderLayout.NORTH);
         root.add(buildPreviewPanel(), BorderLayout.CENTER);
         root.add(buildBottomPanel(), BorderLayout.SOUTH);
@@ -118,25 +151,45 @@ public class MainWindow extends JFrame {
         installDragAndDrop(root);
         wireListeners();
         I18n.bind(() -> status.setText(statusText.get()));
+        I18n.bind(() -> checkLabel.setText(checkText.get()));
         I18n.bind(() -> leftPanel.setPlaceholder(tr("preview.placeholder.left")));
         I18n.bind(() -> rightPanel.setPlaceholder(tr("preview.placeholder.right")));
         I18n.bind(this::updateTitles);
+        I18n.bind(this::updateCellPanel);
         I18n.tip(leftPanel, "preview.left.tip");
-        I18n.tip(rightPanel, "preview.tip");
+        I18n.bind(() -> rightPanel.setToolTipText(tr(tool() == Tool.BITMAP ? "preview.edit.tip" : "preview.tip")));
         leftPanel.setRightClickAction(this::startReframe);
+        rightPanel.setRightClickAction(null);
         toolChanged();
         pack();
-        setMinimumSize(new Dimension(980, 720));
+        setMinimumSize(new Dimension(1100, 820));
         setLocationRelativeTo(null);
     }
 
-    private static DefaultListCellRenderer translatedRenderer(java.util.function.Function<Object, String> f) {
+    /** List renderer with translated text and an optional colour square (palette index). */
+    private DefaultListCellRenderer renderer(java.util.function.Function<Object, String> text,
+                                            java.util.function.Function<Object, Integer> colour) {
         return new DefaultListCellRenderer() {
             @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index,
                                                                     boolean selected, boolean focus) {
-                return super.getListCellRendererComponent(list, value == null ? "" : f.apply(value), index, selected, focus);
+                super.getListCellRendererComponent(list, value == null ? "" : text.apply(value), index, selected, focus);
+                Integer c = value == null || colour == null ? null : colour.apply(value);
+                setIcon(c != null && c >= 0 ? new ColourIcon(palette().rgb(c), 12) : null);
+                return this;
             }
         };
+    }
+
+    /** A filled square in a palette colour. */
+    private record ColourIcon(int rgb, int size) implements Icon {
+        @Override public void paintIcon(Component c, Graphics g, int x, int y) {
+            g.setColor(new Color(rgb));
+            g.fillRect(x, y, size, size);
+            g.setColor(Color.GRAY);
+            g.drawRect(x, y, size - 1, size - 1);
+        }
+        @Override public int getIconWidth() { return size; }
+        @Override public int getIconHeight() { return size; }
     }
 
     // ------------------------------------------------------------------ UI construction
@@ -217,14 +270,17 @@ public class MainWindow extends JFrame {
         c.gridx = 1; c.weightx = 1; p.add(inputField, c);
         c.gridx = 2; c.weightx = 0; p.add(selIn, c);
         c.gridy = 1; c.gridx = 1;
-        JLabel hint = I18n.label("file.hint");
-        hint.setHorizontalAlignment(SwingConstants.CENTER);
-        p.add(hint, c);
+        JPanel opts = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        opts.add(toC64Size);
+        opts.add(I18n.label("file.hint"));
+        p.add(opts, c);
         c.gridy = 2; c.gridx = 0; p.add(fixedLabel("file.output"), c);
         c.gridx = 1; c.weightx = 1; p.add(outputField, c);
         c.gridx = 2; c.weightx = 0; p.add(selOut, c);
         return p;
     }
+
+    private JPanel palettePanel, pixelPanel, ditherPanel, bitmapPanel;
 
     private JPanel buildSettingsPanel() {
         JPanel p = new JPanel(new GridBagLayout());
@@ -232,16 +288,12 @@ public class MainWindow extends JFrame {
         c.fill = GridBagConstraints.BOTH;
         c.weightx = 1;
         c.weighty = 1;
-        c.gridx = 0;
-        p.add(buildPalettePanel(), c);
-        c.gridx = 1;
-        p.add(buildPixelPanel(), c);
-        c.gridx = 2;
-        p.add(buildKoalaPanel(), c);
+        c.gridx = 0; p.add(buildPalettePanel(), c);
+        c.gridx = 1; p.add(buildPixelPanel(), c);
+        c.gridx = 2; p.add(buildDitherPanel(), c);
+        c.gridx = 3; p.add(buildBitmapPanel(), c);
         return p;
     }
-
-    private JPanel palettePanel, pixelPanel, koalaPanel;
 
     private JPanel buildPalettePanel() {
         JPanel p = palettePanel = group("pal.group");
@@ -249,10 +301,9 @@ public class MainWindow extends JFrame {
         JButton custom = I18n.text(new JButton(), "pal.customButton");
         custom.addActionListener(e -> editCustomPalette());
         c.gridy = 0; c.gridx = 0; c.gridwidth = 2; p.add(paletteBox, c);
-        c.gridx = 2; c.gridwidth = 1; p.add(custom, c);
-        c.gridy = 1; c.gridx = 0; p.add(fixedLabel("pal.matchIn"), c);
-        c.gridx = 1; c.gridwidth = 2; p.add(spaceBox, c);
-        c.gridwidth = 1;
+        c.gridy = 1; c.gridx = 0; c.gridwidth = 1; p.add(custom, c);
+        c.gridy = 2; c.gridx = 0; c.gridwidth = 2; p.add(fixedLabel("pal.matchIn"), c);
+        c.gridy = 3; p.add(spaceBox, c);
         addDefaultButton(p, () -> {
             paletteBox.setSelectedItem(Palettes.COLODORE);
             spaceBox.setSelectedItem(ColorMatcher.Space.EUCLID);
@@ -277,30 +328,114 @@ public class MainWindow extends JFrame {
             pairL2R.setSelected(true);
             bothDirections.setSelected(true);
             settingsChanged();
+            updateOutputPath();
         });
         return p;
     }
 
-    private JPanel buildKoalaPanel() {
-        JPanel p = koalaPanel = group("kla.group");
+    private JPanel buildDitherPanel() {
+        JPanel p = ditherPanel = group("dit.group");
         GridBagConstraints c = gbc();
-        c.gridx = 0; c.gridwidth = 2;
-        c.gridy = 0; p.add(koalaPalettize, c);
+        ditherBox.setRenderer(renderer(Object::toString, null));
+        c.gridy = 0; c.gridx = 0; c.gridwidth = 3; p.add(ditherBox, c);
         c.gridwidth = 1;
-        c.gridy = 1; p.add(fixedLabel("kla.background"), c);
-        c.gridx = 1; p.add(backgroundBox, c);
-        c.gridx = 0; c.gridwidth = 2;
-        c.gridy = 2; p.add(fixClashes, c);
-        c.gridy = 3; p.add(markClashes, c);
-        c.gridy = 4; p.add(palAspect, c);
+        JLabel value = new JLabel("80 %");
+        strength.setPreferredSize(new Dimension(110, strength.getPreferredSize().height));
+        strength.addChangeListener(e -> value.setText(strength.getValue() + " %"));
+        c.gridy = 1; c.gridx = 0; p.add(fixedLabel("dit.strength"), c);
+        c.gridx = 1; c.weightx = 1; p.add(strength, c);
+        c.gridx = 2; c.weightx = 0; p.add(value, c);
+        c.gridx = 0; c.gridwidth = 3;
+        c.gridy = 2; p.add(serpentine, c);
+        c.gridy = 3; p.add(bleeding, c);
         addDefaultButton(p, () -> {
-            koalaPalettize.setSelected(true);
-            backgroundBox.setSelectedIndex(0);
-            fixClashes.setSelected(false);
-            markClashes.setSelected(true);
-            palAspect.setSelected(true);
+            ditherBox.setSelectedItem(Dither.NONE);
+            strength.setValue(80);
+            serpentine.setSelected(false);
+            bleeding.setSelected(true);
             settingsChanged();
         });
+        return p;
+    }
+
+    private JPanel buildBitmapPanel() {
+        JPanel p = bitmapPanel = group("bmp.group");
+        GridBagConstraints c = gbc();
+        ButtonGroup g = new ButtonGroup();
+        g.add(modeMc); g.add(modeHires);
+        I18n.tip(I18n.text(modeMc, "mode.MULTICOLOR"), "mode.MULTICOLOR.tip");
+        I18n.tip(I18n.text(modeHires, "mode.HIRES"), "mode.HIRES.tip");
+        c.gridx = 0; c.gridwidth = 2;
+        c.gridy = 0; p.add(row(modeMc, modeHires), c);
+        c.gridy = 1; p.add(bitmapPalettize, c);
+        c.gridwidth = 1;
+        c.gridy = 2; p.add(fixedLabel("bmp.background"), c);
+        c.gridx = 1; p.add(backgroundBox, c);
+        c.gridx = 0; c.gridwidth = 2;
+        c.gridy = 3; p.add(fixClashes, c);
+        c.gridy = 4; p.add(palAspect, c);
+        addDefaultButton(p, () -> {
+            bitmapPalettize.setSelected(true);
+            backgroundBox.setSelectedIndex(0);
+            fixClashes.setSelected(false);
+            palAspect.setSelected(true);
+            updateAspect();
+            settingsChanged();
+        });
+        return p;
+    }
+
+    /** Colour check result, conflict navigation and the manual correction of single cells. */
+    private JPanel buildCheckPanel() {
+        JPanel p = checkPanel = group("chk.group");
+        GridBagConstraints c = gbc();
+        JButton prev = I18n.tip(new JButton("◀"), "chk.prev.tip"), next = I18n.tip(new JButton("▶"), "chk.next.tip");
+        prev.setMargin(new Insets(1, 6, 1, 6));
+        next.setMargin(new Insets(1, 6, 1, 6));
+        prev.addActionListener(e -> jumpToClash(-1));
+        next.addActionListener(e -> jumpToClash(1));
+        ButtonGroup g = new ButtonGroup();
+        g.add(toolSelect); g.add(toolPaint);
+        JPanel line1 = new JPanel(new BorderLayout(8, 0));
+        checkLabel.setFont(checkLabel.getFont().deriveFont(Font.BOLD));
+        line1.add(checkLabel, BorderLayout.CENTER);
+        JPanel nav = row(I18n.label("chk.conflict"), prev, next, markCells, Box.createHorizontalStrut(12),
+                I18n.label("chk.click"), toolSelect, toolPaint, paintColour);
+        line1.add(nav, BorderLayout.EAST);
+        c.gridx = 0; c.gridy = 0; c.weightx = 1; p.add(line1, c);
+
+        JPanel sw = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        sw.add(cellLabel);
+        for (int i = 0; i < 16; i++) {
+            JToggleButton b = new JToggleButton();
+            b.setMargin(new Insets(1, 2, 1, 2));
+            b.setFocusable(false);
+            b.setHorizontalTextPosition(SwingConstants.CENTER);
+            b.setVerticalTextPosition(SwingConstants.BOTTOM);
+            b.setFont(b.getFont().deriveFont(10f));
+            b.addActionListener(e -> updateCellHint());
+            swatches[i] = b;
+            sw.add(b);
+        }
+        sw.add(Box.createHorizontalStrut(8));
+        sw.add(applyCell);
+        sw.add(autoCell);
+        sw.add(resetCell);
+        sw.add(resetAll);
+        c.gridy = 1; p.add(sw, c);
+        c.gridy = 2; p.add(cellHint, c);
+        applyCell.addActionListener(e -> applyCellColours());
+        autoCell.addActionListener(e -> autoCellColours());
+        resetCell.addActionListener(e -> resetSelectedCell());
+        resetAll.addActionListener(e -> {
+            cellEdits.clear();
+            pixelEdits.clear();
+            settingsChanged();
+        });
+        markCells.addActionListener(e -> updateRight());
+        toolSelect.addActionListener(e -> editToolChanged());
+        toolPaint.addActionListener(e -> editToolChanged());
+        paintColour.setSelectedIndex(1);
         return p;
     }
 
@@ -316,6 +451,12 @@ public class MainWindow extends JFrame {
         c.anchor = GridBagConstraints.WEST;
         c.fill = GridBagConstraints.HORIZONTAL;
         return c;
+    }
+
+    private static JPanel row(Component... comps) {
+        JPanel r = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        for (Component comp : comps) r.add(comp);
+        return r;
     }
 
     /** A label whose minimum width always fits its (translated) text. */
@@ -350,7 +491,7 @@ public class MainWindow extends JFrame {
         p.add(previewBox(rightPanel, rightTitle));
         leftPanel.addViewListener(src -> { if (linkViews.isSelected() && sameSize()) rightPanel.copyViewFrom(src); });
         rightPanel.addViewListener(src -> { if (linkViews.isSelected() && sameSize()) leftPanel.copyViewFrom(src); });
-        linkViews.addActionListener(e -> { if (linkViews.isSelected()) rightPanel.copyViewFrom(leftPanel); });
+        linkViews.addActionListener(e -> { if (linkViews.isSelected() && sameSize()) rightPanel.copyViewFrom(leftPanel); });
         showGrid.addActionListener(e -> {
             leftPanel.setShowGrid(showGrid.isSelected());
             rightPanel.setShowGrid(showGrid.isSelected());
@@ -439,23 +580,35 @@ public class MainWindow extends JFrame {
         status.setText(statusText.get());
     }
 
+    private void setCheck(String key, Object... args) {
+        checkText = () -> tr(key, args);
+        checkLabel.setText(checkText.get());
+    }
+
     private void wireListeners() {
         for (JRadioButton b : toolButtons) b.addActionListener(e -> toolChanged());
         paletteBox.addActionListener(e -> {
-            // a Koala file as input is drawn with the selected palette
-            if (inputFile != null && Images.isKoala(inputFile.toPath())) reloadKoalaInput();
+            // C64 files as input are drawn with the selected palette
+            if (inputFile != null && Images.isC64File(inputFile.toPath())) reloadC64Input();
             settingsChanged();
+            updateCellPanel();
         });
         spaceBox.addActionListener(e -> settingsChanged());
-        for (AbstractButton b : new AbstractButton[]{pairL2R, pairR2L, pairAvg, bothDirections, koalaPalettize,
-                fixClashes, markClashes})
+        for (AbstractButton b : new AbstractButton[]{pairL2R, pairR2L, pairAvg, bothDirections, bitmapPalettize,
+                fixClashes, serpentine, bleeding})
             b.addActionListener(e -> settingsChanged());
-        bothDirections.addActionListener(e -> updateOutputPath());
-        pairL2R.addActionListener(e -> updateOutputPath());
-        pairR2L.addActionListener(e -> updateOutputPath());
-        pairAvg.addActionListener(e -> updateOutputPath());
+        for (AbstractButton b : new AbstractButton[]{pairL2R, pairR2L, pairAvg, bothDirections})
+            b.addActionListener(e -> updateOutputPath());
+        modeMc.addActionListener(e -> modeChanged());
+        modeHires.addActionListener(e -> modeChanged());
+        ditherBox.addActionListener(e -> settingsChanged());
+        strength.addChangeListener(e -> { if (!strength.getValueIsAdjusting()) settingsChanged(); });
         backgroundBox.addActionListener(e -> settingsChanged());
         palAspect.addActionListener(e -> updateAspect());
+        toC64Size.addActionListener(e -> {
+            if (toC64Size.isSelected()) ensureFrame();
+            refreshInput();
+        });
     }
 
     private Tool tool() {
@@ -463,23 +616,32 @@ public class MainWindow extends JFrame {
         return Tool.PALETTIZE;
     }
 
-    private void toolChanged() {
+    private C64Mode mode() { return modeHires.isSelected() ? C64Mode.HIRES : C64Mode.MULTICOLOR; }
+
+    private Palette palette() { return (Palette) paletteBox.getSelectedItem(); }
+
+    /** Enables what belongs to the current tool and settings. */
+    private void updateEnabled() {
         Tool t = tool();
+        boolean bitmap = t == Tool.BITMAP;
         setEnabledDeep(palettePanel, t != Tool.PIXELIZE);
-        setEnabledDeep(pixelPanel, t != Tool.PALETTIZE);
+        setEnabledDeep(pixelPanel, t == Tool.PIXELIZE || (bitmap && mode() == C64Mode.MULTICOLOR));
         bothDirections.setEnabled(t == Tool.PIXELIZE && !pairAvg.isSelected());
-        setEnabledDeep(koalaPanel, t == Tool.KOALA);
-        cropButton.setEnabled(t == Tool.KOALA);
-        if (t == Tool.KOALA && source != null && fitSettings == null && !KoalaConverter.isValidSize(source)) {
-            // pictures that are not C64-sized need a frame first
-            SwingUtilities.invokeLater(this::openCropDialog);
-        }
-        result = null;
-        updateOutputPath();
-        updateTitles();
-        updateLeft();
-        updateRight();
-        settingsChanged();
+        boolean ditherOk = t == Tool.PALETTIZE || (bitmap && bitmapPalettize.isSelected());
+        setEnabledDeep(ditherPanel, ditherOk);
+        bleeding.setEnabled(ditherOk && bitmap);
+        setEnabledDeep(bitmapPanel, bitmap);
+        backgroundBox.setEnabled(bitmap && mode() == C64Mode.MULTICOLOR);
+        fixClashes.setEnabled(bitmap && !ditherActive());
+        toC64Size.setEnabled(!bitmap);
+        toC64Size.setSelected(bitmap || toC64Size.isSelected());
+        checkPanel.setVisible(bitmap);
+        paintColour.setEnabled(toolPaint.isSelected());
+        cropButton.setEnabled(source != null && usesFrame());
+    }
+
+    private boolean ditherActive() {
+        return ditherBox.getSelectedItem() != Dither.NONE && strength.getValue() > 0;
     }
 
     private static void setEnabledDeep(Container c, boolean on) {
@@ -490,10 +652,78 @@ public class MainWindow extends JFrame {
         }
     }
 
-    private void updateTitles() {
+    private boolean toolChangeRemembered;
+    private boolean c64SizeBeforeBitmap = true;
+
+    private void toolChanged() {
         Tool t = tool();
-        leftTitle.setText(tr(t == Tool.KOALA && koalaInput != null && koalaInput != source ? "view.framed" : "view.original"));
-        rightTitle.setText(tr("view.result." + t.name()));
+        // the bitmap tool always needs 320×200; remember the user's choice for the other tools
+        if (t == Tool.BITMAP && !toolChangeRemembered) {
+            c64SizeBeforeBitmap = toC64Size.isSelected();
+            toolChangeRemembered = true;
+        } else if (t != Tool.BITMAP && toolChangeRemembered) {
+            toC64Size.setSelected(c64SizeBeforeBitmap);
+            toolChangeRemembered = false;
+        }
+        rightPanel.setPixelListener(t == Tool.BITMAP ? this::resultClicked : null);
+        rightPanel.setToolTipText(tr(t == Tool.BITMAP ? "preview.edit.tip" : "preview.tip"));
+        if (usesFrame()) ensureFrame();
+        result = null;
+        updateEnabled();
+        updateOutputPath();
+        refreshInput();
+    }
+
+    private void modeChanged() {
+        // pixel and cell coordinates differ between the modes
+        cellEdits.clear();
+        pixelEdits.clear();
+        selectedCell = -1;
+        updateEnabled();
+        updateOutputPath();
+        updateCellPanel();
+        settingsChanged();
+    }
+
+    private void editToolChanged() {
+        paintColour.setEnabled(toolPaint.isSelected());
+    }
+
+    private void updateTitles() {
+        leftTitle.setText(tr(input() != null && input() != source ? "view.framed" : "view.original"));
+        rightTitle.setText(tr("view.result." + tool().name()));
+    }
+
+    // ------------------------------------------------------------------ input picture & frame
+
+    /** Whether the current tool works on the 320×200 version of the picture. */
+    private boolean usesFrame() { return tool() == Tool.BITMAP || toC64Size.isSelected(); }
+
+    /** Picture the current tool works on; null = a frame has to be chosen first. */
+    private BufferedImage input() {
+        if (source == null) return null;
+        if (!usesFrame()) return source;
+        if (fitSettings != null) return fitted;
+        if (tool() == Tool.BITMAP && BitmapConverter.isValidSize(source)) return source;
+        if (source.getWidth() == 320 && source.getHeight() == 200) return source;
+        if (ImageFitter.isNativeSize(source)) return ImageFitter.fit(source, ImageFitter.Settings.defaults());
+        return null;
+    }
+
+    /** Opens the crop & scale dialog if the picture needs a frame and none is chosen yet. */
+    private void ensureFrame() {
+        if (source != null && fitSettings == null && !ImageFitter.isNativeSize(source))
+            SwingUtilities.invokeLater(() -> {
+                if (fitSettings == null && usesFrame()) openCropDialog();
+            });
+    }
+
+    private void refreshInput() {
+        updateEnabled();
+        updateTitles();
+        updateLeft();
+        updateRight();
+        settingsChanged();
     }
 
     // ------------------------------------------------------------------ computation
@@ -501,7 +731,7 @@ public class MainWindow extends JFrame {
     private void settingsChanged() {
         generation++;
         if (source != null) updateTimer.restart();
-        bothDirections.setEnabled(tool() == Tool.PIXELIZE && !pairAvg.isSelected());
+        updateEnabled();
     }
 
     private Pixelizer.Direction direction() {
@@ -509,23 +739,36 @@ public class MainWindow extends JFrame {
                 : pairAvg.isSelected() ? Pixelizer.Direction.AVERAGE : Pixelizer.Direction.L2R;
     }
 
+    private Ditherer.Settings ditherSettings() {
+        return new Ditherer.Settings((Dither) ditherBox.getSelectedItem(), strength.getValue(),
+                serpentine.isSelected(), bleeding.isSelected());
+    }
+
+    private BitmapConverter.Settings bitmapSettings() {
+        return new BitmapConverter.Settings(mode(), palette(), (ColorMatcher.Space) spaceBox.getSelectedItem(),
+                direction(), bitmapPalettize.isSelected(), (Integer) backgroundBox.getSelectedItem(),
+                fixClashes.isSelected(), ditherSettings());
+    }
+
     private void recompute() {
         if (source == null) return;
         Tool t = tool();
-        BufferedImage in = t == Tool.KOALA ? koalaInput : source;
+        BufferedImage in = input();
         if (in == null) {
             result = null;
             updateRight();
             setStatus("status.needFrame", source.getWidth(), source.getHeight());
+            setCheck("chk.none");
             return;
         }
         long gen = generation;
-        Palette pal = (Palette) paletteBox.getSelectedItem();
+        Palette pal = palette();
         ColorMatcher.Space space = (ColorMatcher.Space) spaceBox.getSelectedItem();
         Pixelizer.Direction dir = direction();
         boolean both = bothDirections.isSelected() && dir != Pixelizer.Direction.AVERAGE;
-        KoalaConverter.Settings ks = new KoalaConverter.Settings(pal, space, dir, koalaPalettize.isSelected(),
-                (Integer) backgroundBox.getSelectedItem(), fixClashes.isSelected());
+        Ditherer.Settings ds = ditherSettings();
+        BitmapConverter.Settings bs = bitmapSettings();
+        BitmapConverter.Edits edits = new BitmapConverter.Edits(Map.copyOf(cellEdits), Map.copyOf(pixelEdits));
         long t0 = System.currentTimeMillis();
         if (worker != null) worker.cancel(false);
         progress.setVisible(true);
@@ -533,7 +776,7 @@ public class MainWindow extends JFrame {
             @Override protected Computed doInBackground() {
                 switch (t) {
                     case PALETTIZE:
-                        return new Computed(t, Palettizer.palettize(in, pal, space), null, null, null);
+                        return new Computed(t, Palettizer.palettize(in, pal, space, ds), null, null, null);
                     case PIXELIZE: {
                         // "both directions": L2R in the output file, R2L next to it (like the old c64pixelizer)
                         BufferedImage a = Pixelizer.pixelize(in, both ? Pixelizer.Direction.L2R : dir);
@@ -542,11 +785,9 @@ public class MainWindow extends JFrame {
                     }
                     default:
                         try {
-                            KoalaConverter.Result r = KoalaConverter.convert(in, ks);
-                            BufferedImage img = r.ok() ? r.koala().render(pal)
-                                    : Palettizer.render(doubleWidth(r.indices()), 320, 200, pal);
-                            return new Computed(t, img, null, r, null);
-                        } catch (KoalaConverter.ConversionException e) {
+                            BitmapConverter.Result r = BitmapConverter.convert(in, bs, edits);
+                            return new Computed(t, r.render(pal), null, r, null);
+                        } catch (BitmapConverter.ConversionException e) {
                             return new Computed(t, null, null, null, e.getMessage());
                         }
                 }
@@ -562,16 +803,11 @@ public class MainWindow extends JFrame {
                     result = new Computed(t, null, null, null, String.valueOf(cause.getMessage()));
                 }
                 updateRight();
+                updateCellPanel();
                 reportResult(System.currentTimeMillis() - t0);
             }
         };
         worker.execute();
-    }
-
-    private static int[] doubleWidth(int[] idx160) {
-        int[] out = new int[320 * 200];
-        for (int i = 0; i < idx160.length; i++) out[2 * i] = out[2 * i + 1] = idx160[i];
-        return out;
     }
 
     private void reportResult(long ms) {
@@ -579,25 +815,32 @@ public class MainWindow extends JFrame {
         double secs = ms / 1000.0;
         if (result.error() != null) {
             setStatus("status.error", result.error());
+            setCheck("chk.none");
             return;
         }
-        KoalaConverter.Result k = result.koala();
-        if (k == null) {
+        BitmapConverter.Result r = result.bitmap();
+        if (r == null) {
             setStatus("status.ready", secs);
-        } else if (!k.ok()) {
-            setStatus("status.clashes", k.clashCells().size());
-        } else if (!k.clashCells().isEmpty()) {
-            setStatus("status.koalaFixed", secs, k.background(), k.clashCells().size());
+            return;
+        }
+        String modeName = r.mode().toString();
+        int edits = cellEdits.size() + pixelEdits.size();
+        if (r.ok()) {
+            if (r.mode().sharedBackground) setCheck("chk.okMc", modeName, r.background());
+            else setCheck("chk.ok", modeName);
+            setStatus(r.fixedCells().isEmpty() ? "status.bitmapOk" : "status.bitmapFixed",
+                    secs, r.fixedCells().size(), edits);
         } else {
-            setStatus("status.koalaOk", secs, k.background());
+            setCheck("chk.bad", r.clashCells().size(), modeName, r.mode().coloursPerCell);
+            setStatus("status.clashes", r.clashCells().size());
         }
     }
 
     // ------------------------------------------------------------------ previews
 
     private void updateLeft() {
-        BufferedImage img = tool() == Tool.KOALA && koalaInput != null ? koalaInput : source;
-        leftPanel.setImage(img);
+        BufferedImage in = input();
+        leftPanel.setImage(in != null ? in : source);
         updateAspect();
     }
 
@@ -608,25 +851,34 @@ public class MainWindow extends JFrame {
             return;
         }
         BufferedImage img = result.image();
-        KoalaConverter.Result k = result.koala();
-        if (k != null && markClashes.isSelected() && !k.clashCells().isEmpty()) img = markCells(img, k.clashCells(), !k.ok());
+        BitmapConverter.Result r = result.bitmap();
+        if (r != null && (markCells.isSelected() || selectedCell >= 0)) img = markCells(img, r);
         rightPanel.setImage(img);
         updateAspect();
-        if (linkViews.isSelected() && sameSize()) rightPanel.copyViewFrom(leftPanel);
     }
 
-    /** Outlines cells (8×8 on the 320×200 picture): red = too many colours, yellow = repaired. */
-    private static BufferedImage markCells(BufferedImage src, List<Integer> cells, boolean errors) {
+    /** Outlines cells on the 320×200 picture: red = breaks the rules, yellow = corrected, cyan = selected. */
+    private BufferedImage markCells(BufferedImage src, BitmapConverter.Result r) {
         BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_RGB);
         Graphics2D g = out.createGraphics();
         g.drawImage(src, 0, 0, null);
-        g.setColor(errors ? new Color(255, 40, 40) : new Color(255, 220, 0));
-        for (int cell : cells) {
-            int x = (cell % KoalaImage.COLS) * 8, y = (cell / KoalaImage.COLS) * 8;
-            g.drawRect(x, y, 7, 7);
+        if (markCells.isSelected()) {
+            g.setColor(new Color(255, 220, 0));
+            for (int cell : r.fixedCells()) outline(g, cell);
+            for (int cell : cellEdits.keySet()) outline(g, cell);
+            g.setColor(new Color(255, 40, 40));
+            for (int cell : r.clashCells()) outline(g, cell);
+        }
+        if (selectedCell >= 0) {
+            g.setColor(Color.CYAN);
+            outline(g, selectedCell);
         }
         g.dispose();
         return out;
+    }
+
+    private static void outline(Graphics2D g, int cell) {
+        g.drawRect((cell % C64Mode.COLS) * 8, (cell / C64Mode.COLS) * 8, 7, 7);
     }
 
     private void updateAspect() {
@@ -638,7 +890,132 @@ public class MainWindow extends JFrame {
     private double aspectOf(BufferedImage img) {
         if (img == null) return 320 * PAL_PIXEL / 200;
         double a = (double) img.getWidth() / img.getHeight();
-        return palAspect.isSelected() && KoalaConverter.isValidSize(img) ? 320 * PAL_PIXEL / 200 : a;
+        return palAspect.isSelected() && BitmapConverter.isValidSize(img) ? 320 * PAL_PIXEL / 200 : a;
+    }
+
+    // ------------------------------------------------------------------ colour check & manual correction
+
+    /** Left click / drag into the result of the bitmap tool. */
+    private void resultClicked(int x, int y, boolean dragging) {
+        if (result == null || result.bitmap() == null) return;
+        C64Mode m = result.bitmap().mode();
+        int mx = x / m.pixelWidth(), cell = m.cellOf(mx, y);
+        if (toolPaint.isSelected()) {
+            Integer colour = (Integer) paintColour.getSelectedItem();
+            if (colour == null) return;
+            Integer old = pixelEdits.put(y * m.width + mx, colour);
+            if (Objects.equals(old, colour) && result.bitmap().indices()[y * m.width + mx] == colour) return;
+            selectedCell = cell;
+            settingsChanged();
+        } else if (!dragging) {
+            selectedCell = cell;
+            updateCellPanel();
+            updateRight();
+        }
+    }
+
+    /** Shows the colours of the selected cell as toggle buttons (selected = used / allowed). */
+    private void updateCellPanel() {
+        BitmapConverter.Result r = result != null ? result.bitmap() : null;
+        boolean has = r != null && selectedCell >= 0;
+        int bg = r != null ? r.background() : -1;
+        int[] count = has ? r.cellCounts(selectedCell) : new int[16];
+        int[] own = has ? cellEdits.get(selectedCell) : null;
+        Palette pal = palette();
+        for (int i = 0; i < 16; i++) {
+            JToggleButton b = swatches[i];
+            b.setIcon(new ColourIcon(pal.rgb(i), 16));
+            b.setText(i == bg ? tr("chk.bgShort") : count[i] > 0 ? String.valueOf(count[i]) : " ");
+            b.setToolTipText(tr("chk.swatch.tip", i, tr("color." + i), count[i]));
+            boolean selected = own != null ? contains(own, i) : count[i] > 0;
+            b.setSelected(has && i != bg && selected);
+            b.setEnabled(has && i != bg);
+        }
+        for (JButton b : new JButton[]{applyCell, autoCell, resetCell}) b.setEnabled(has);
+        resetAll.setEnabled(!cellEdits.isEmpty() || !pixelEdits.isEmpty());
+        if (has) {
+            C64Mode m = r.mode();
+            int used = 0;
+            for (int i = 0; i < 16; i++) if (count[i] > 0 && i != bg) used++;
+            cellLabel.setText(tr("chk.cell", selectedCell % C64Mode.COLS, selectedCell / C64Mode.COLS,
+                    used, m.coloursPerCell));
+            cellLabel.setForeground(used > m.coloursPerCell ? new Color(200, 30, 30) : UIManager.getColor("Label.foreground"));
+        } else {
+            cellLabel.setText(tr("chk.noCell"));
+            cellLabel.setForeground(UIManager.getColor("Label.foreground"));
+        }
+        updateCellHint();
+    }
+
+    private void updateCellHint() {
+        BitmapConverter.Result r = result != null ? result.bitmap() : null;
+        if (r == null || selectedCell < 0) {
+            cellHint.setText(tr(r == null ? " " : "chk.hint"));
+            return;
+        }
+        int chosen = chosenColours().length, max = r.mode().coloursPerCell;
+        cellHint.setText(chosen > max ? tr("chk.tooMany", chosen, max)
+                : tr(r.mode().sharedBackground ? "chk.hintCellMc" : "chk.hintCell", max));
+        applyCell.setEnabled(chosen <= max && (chosen > 0 || r.mode().sharedBackground));
+    }
+
+    private int[] chosenColours() {
+        return Arrays.stream(swatches).filter(b -> b.isSelected() && b.isEnabled())
+                .mapToInt(b -> Arrays.asList(swatches).indexOf(b)).toArray();
+    }
+
+    private static boolean contains(int[] a, int v) {
+        for (int x : a) if (x == v) return true;
+        return false;
+    }
+
+    /** Manual: the selected cell may only use the toggled colours (pixels get the nearest of them). */
+    private void applyCellColours() {
+        if (selectedCell < 0) return;
+        cellEdits.put(selectedCell, chosenColours());
+        removePixelEditsInCell(selectedCell);
+        settingsChanged();
+    }
+
+    /** Automatic for one cell: the colours that reproduce the cell best. */
+    private void autoCellColours() {
+        if (selectedCell < 0 || result == null || result.bitmap() == null || input() == null) return;
+        cellEdits.put(selectedCell, BitmapConverter.suggestColours(input(), bitmapSettings(), selectedCell,
+                result.bitmap().background()));
+        removePixelEditsInCell(selectedCell);
+        settingsChanged();
+    }
+
+    private void resetSelectedCell() {
+        if (selectedCell < 0) return;
+        cellEdits.remove(selectedCell);
+        removePixelEditsInCell(selectedCell);
+        settingsChanged();
+    }
+
+    private void removePixelEditsInCell(int cell) {
+        C64Mode m = mode();
+        pixelEdits.keySet().removeIf(p -> m.cellOf(p % m.width, p / m.width) == cell);
+    }
+
+    /** Selects the next / previous cell that breaks the rules and shows it zoomed in. */
+    private void jumpToClash(int dirSign) {
+        if (result == null || result.bitmap() == null || result.bitmap().clashCells().isEmpty()) {
+            Toolkit.getDefaultToolkit().beep();
+            return;
+        }
+        List<Integer> cells = result.bitmap().clashCells();
+        int target = dirSign > 0 ? cells.get(0) : cells.get(cells.size() - 1);
+        for (int i = 0; i < cells.size(); i++) {
+            int c = dirSign > 0 ? cells.get(i) : cells.get(cells.size() - 1 - i);
+            if (dirSign > 0 ? c > selectedCell : c < selectedCell) { target = c; break; }
+        }
+        selectedCell = target;
+        toolSelect.setSelected(true);
+        editToolChanged();
+        updateCellPanel();
+        updateRight();
+        rightPanel.showArea(new Rectangle((target % C64Mode.COLS) * 8, (target / C64Mode.COLS) * 8, 8, 8), 4);
     }
 
     // ------------------------------------------------------------------ files
@@ -674,7 +1051,7 @@ public class MainWindow extends JFrame {
         File current = outputField.getText().isBlank() ? null : new File(outputField.getText());
         JFileChooser fc = FileDialogs.chooser("dlg.output.title", current != null ? current.getParentFile() : null);
         String ext = outputExtension();
-        FileDialogs.addFilter(fc, ext.equals("kla") ? "filter.kla" : "filter.png", ext);
+        FileDialogs.addFilter(fc, ext.equals("kla") ? "filter.kla" : ext.equals("art") ? "filter.art" : "filter.png", ext);
         if (current != null) fc.setSelectedFile(current);
         if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             String p = fc.getSelectedFile().getPath();
@@ -685,7 +1062,7 @@ public class MainWindow extends JFrame {
         }
     }
 
-    private String outputExtension() { return tool() == Tool.KOALA ? "kla" : "png"; }
+    private String outputExtension() { return tool() == Tool.BITMAP ? mode().extension : "png"; }
 
     /** Output = input name plus the suffix of the old tools, in the chosen output folder or next to the input. */
     private void updateOutputPath() {
@@ -695,16 +1072,20 @@ public class MainWindow extends JFrame {
             case PALETTIZE -> base + "_palettized.png";
             case PIXELIZE -> base + (bothDirections.isSelected() && !pairAvg.isSelected()
                     ? Pixelizer.Direction.L2R : direction()).fileSuffix() + ".png";
-            case KOALA -> base + ".kla";
+            case BITMAP -> base + "." + mode().extension;
         };
         File dir = outputDirChosen != null ? outputDirChosen : inputFile.getAbsoluteFile().getParentFile();
-        outputField.setText(new File(dir, name).getPath());
+        File target = new File(dir, name);
+        // never suggest overwriting the input file itself (e.g. a .kla opened in the bitmap tool)
+        if (target.getAbsoluteFile().equals(inputFile.getAbsoluteFile()))
+            target = new File(dir, base + "_new." + outputExtension());
+        outputField.setText(target.getPath());
     }
 
     private void loadInput(File f) {
         BufferedImage img;
         try {
-            img = Images.read(f.toPath(), (Palette) paletteBox.getSelectedItem());
+            img = Images.read(f.toPath(), palette());
         } catch (Exception ex) {
             error(tr("err.read", ex.getMessage()));
             return;
@@ -712,8 +1093,8 @@ public class MainWindow extends JFrame {
         FileDialogs.rememberDir("input", f);
         if (leftPanel.isCropMode()) leftPanel.cancelCrop();
         ImageFitter.Settings fs = null;
-        if (tool() == Tool.KOALA && !KoalaConverter.isValidSize(img)) {
-            CropScaleDialog d = new CropScaleDialog(this, img, ImageFitter.Settings.defaults());
+        if (usesFrame() && !ImageFitter.isNativeSize(img)) {
+            CropScaleDialog d = new CropScaleDialog(this, img, ImageFitter.Settings.suggested(img));
             d.setVisible(true);
             if (!d.isAccepted()) {
                 setStatus("status.loadCancelled");
@@ -724,59 +1105,67 @@ public class MainWindow extends JFrame {
         inputFile = f;
         source = img;
         fitSettings = fs;
+        fitted = fs != null ? ImageFitter.fit(img, fs) : null;
+        cellEdits.clear();
+        pixelEdits.clear();
+        selectedCell = -1;
         inputField.setText(f.getPath());
         updateOutputPath();
         result = null;
-        applyFit();
+        refreshInput();
         leftPanel.fit();
         rightPanel.fit();
         setStatus("status.loaded", f.getName(), img.getWidth(), img.getHeight());
     }
 
-    /** A Koala file as input is redrawn when the palette changes. */
-    private void reloadKoalaInput() {
+    /** A C64 file as input is redrawn when the palette changes. */
+    private void reloadC64Input() {
         try {
-            source = Images.read(inputFile.toPath(), (Palette) paletteBox.getSelectedItem());
-            applyFit();
+            source = Images.read(inputFile.toPath(), palette());
+            if (fitSettings != null) fitted = ImageFitter.fit(source, fitSettings);
+            updateLeft();
         } catch (Exception ex) {
             error(tr("err.read", ex.getMessage()));
         }
     }
 
-    /** Builds the 320×200 input of the Koala tool. */
+    /** Applies {@link #fitSettings}; a new frame discards the manual corrections. */
     private void applyFit() {
         if (source == null) return;
-        if (KoalaConverter.isValidSize(source) && fitSettings == null) koalaInput = source;
-        else if (fitSettings != null) koalaInput = ImageFitter.fit(source, fitSettings);
-        else koalaInput = null;
-        updateTitles();
-        updateLeft();
-        settingsChanged();
+        fitted = fitSettings != null ? ImageFitter.fit(source, fitSettings) : null;
+        cellEdits.clear();
+        pixelEdits.clear();
+        refreshInput();
     }
 
     private void openCropDialog() {
-        if (source == null || tool() != Tool.KOALA) return;
+        if (source == null || !usesFrame()) return;
         if (leftPanel.isCropMode()) leftPanel.cancelCrop();
         CropScaleDialog d = new CropScaleDialog(this, source,
-                fitSettings != null ? fitSettings : ImageFitter.Settings.defaults());
+                fitSettings != null ? fitSettings : ImageFitter.Settings.suggested(source));
         d.setVisible(true);
         if (d.isAccepted()) {
             fitSettings = d.getSettings();
             applyFit();
-        } else if (koalaInput == null) {
+        } else if (input() == null) {
             setStatus("status.needFrame", source.getWidth(), source.getHeight());
         }
     }
 
-    /** Right click on the original (Koala tool): choose the frame directly in the preview. */
+    /** Right click on the original: choose the frame directly in the preview. */
     private void startReframe() {
-        if (source == null || tool() != Tool.KOALA || leftPanel.isCropMode()) return;
-        ImageFitter.Settings base = fitSettings != null ? fitSettings : ImageFitter.Settings.defaults();
-        double ratio = base.aspect().ratio > 0 ? base.aspect().ratio : 1.6;
+        if (source == null || !usesFrame() || leftPanel.isCropMode()) return;
+        ImageFitter.Settings base = fitSettings != null ? fitSettings : ImageFitter.Settings.suggested(source);
+        boolean fixed = base.mode() == ImageFitter.ScaleMode.NONE;
+        if (fixed && (source.getWidth() < ImageFitter.W || source.getHeight() < ImageFitter.H)) {
+            openCropDialog();   // a 1:1 frame larger than the picture is only possible in the dialog
+            return;
+        }
+        double ratio = fixed ? 1.6 : base.aspect().ratio > 0 ? base.aspect().ratio : 1.6;
         reframeBackup = fitSettings;
-        leftPanel.startCrop(source, base.crop(), ratio, new ImagePanel.CropListener() {
+        leftPanel.startCrop(source, base.crop(), ratio, fixed, new ImagePanel.CropListener() {
             @Override public void cropChanged(Rectangle crop) {
-                fitSettings = new ImageFitter.Settings(crop, ImageFitter.ScaleMode.FILL,
+                fitSettings = new ImageFitter.Settings(crop, fixed ? ImageFitter.ScaleMode.NONE : ImageFitter.ScaleMode.FILL,
                         base.filter(), base.aspect(), base.fill());
                 fitTimer.restart();
             }
@@ -799,7 +1188,7 @@ public class MainWindow extends JFrame {
             error(tr("err.openFirst"));
             return;
         }
-        if (result == null || result.tool() != tool() || (updateTimer.isRunning() || (worker != null && !worker.isDone()))) {
+        if (result == null || result.tool() != tool() || updateTimer.isRunning() || (worker != null && !worker.isDone())) {
             setStatus("status.wait");
             return;
         }
@@ -830,18 +1219,17 @@ public class MainWindow extends JFrame {
                         written.add(second.getFileName().toString());
                     }
                 }
-                case KOALA -> {
-                    KoalaConverter.Result k = result.koala();
-                    if (!k.ok()) {
-                        error(tr("err.clashes", k.clashCells().size()));
+                case BITMAP -> {
+                    BitmapConverter.Result r = result.bitmap();
+                    if (!r.ok()) {
+                        error(tr("err.clashes", r.clashCells().size(), r.mode().toString()));
                         return;
                     }
-                    Files.write(target, k.koala().toBytes());
+                    Files.write(target, r.fileBytes());
                     written.add(target.getFileName().toString());
                 }
             }
-            String list = String.join(", ", written);
-            setStatus("status.saved", list);
+            setStatus("status.saved", String.join(", ", written));
         } catch (Exception ex) {
             error(tr("err.write", ex.getMessage()));
         }
@@ -866,7 +1254,7 @@ public class MainWindow extends JFrame {
         String s = fc.getSelectedFile().getPath();
         Path p = Path.of(s.toLowerCase(Locale.ROOT).endsWith(".png") ? s : s + ".png");
         try {
-            Images.writePng(result.image(), p);   // without clash markers
+            Images.writePng(result.image(), p);   // without cell markers
             setStatus("status.saved", p.getFileName());
         } catch (Exception ex) {
             error(tr("err.write", ex.getMessage()));
@@ -874,7 +1262,7 @@ public class MainWindow extends JFrame {
     }
 
     private void editCustomPalette() {
-        PaletteEditorDialog d = new PaletteEditorDialog(this, (Palette) paletteBox.getSelectedItem());
+        PaletteEditorDialog d = new PaletteEditorDialog(this, palette());
         d.setVisible(true);
         if (!d.isAccepted()) return;
         Palette p = d.getPalette();

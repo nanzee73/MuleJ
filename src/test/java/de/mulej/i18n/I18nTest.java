@@ -21,6 +21,24 @@ class I18nTest {
         return new TreeSet<>(p.stringPropertyNames());
     }
 
+    /** Without a stored choice the user interface starts in English (like FlipperJ). */
+    @Test
+    void englishIsTheDefault() throws Exception {
+        java.util.prefs.Preferences p = java.util.prefs.Preferences.userRoot().node("de/mulej");
+        String old = p.get("language", null);
+        try {
+            p.remove("language");
+            I18n.init();
+            assertEquals(java.util.Locale.ENGLISH, I18n.locale());
+            assertEquals("Save", I18n.tr("bottom.run"));
+            I18n.setLocale(java.util.Locale.GERMAN);
+            assertEquals("Speichern", I18n.tr("bottom.run"));
+        } finally {
+            if (old != null) p.put("language", old); else p.remove("language");
+            I18n.init();
+        }
+    }
+
     @Test
     void everyLanguageHasTheSameKeys() throws Exception {
         Set<String> en = keys("messages.properties");
@@ -53,7 +71,7 @@ class I18nTest {
     void generatedKeysExist() throws Exception {
         Set<String> en = keys("messages.properties");
         Set<String> need = new TreeSet<>();
-        for (String t : new String[]{"PALETTIZE", "PIXELIZE", "KOALA"}) {
+        for (String t : new String[]{"PALETTIZE", "PIXELIZE", "BITMAP"}) {
             need.add("tool." + t); need.add("tool." + t + ".tip"); need.add("view.result." + t);
         }
         for (var s : de.mulej.color.ColorMatcher.Space.values()) need.add("space." + s.name());
@@ -62,6 +80,8 @@ class I18nTest {
         for (var f : de.mulej.image.ImageFitter.Filter.values()) need.add("scalefilter." + f.name());
         for (var a : de.mulej.image.ImageFitter.Aspect.values()) need.add("aspect." + a.name());
         for (int i = 0; i < 16; i++) need.add("color." + i);
+        for (var m : de.mulej.core.C64Mode.values()) { need.add("mode." + m.name()); need.add("mode." + m.name() + ".tip"); }
+        for (var d : de.mulej.core.Dither.values()) need.add("dither." + d.name());
         need.removeAll(en);
         assertEquals(Set.of(), need);
     }

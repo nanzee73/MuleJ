@@ -8,7 +8,9 @@ public final class ImageFitter {
     public static final int W = 320, H = 200;
 
     public enum ScaleMode {
-        STRETCH("Stretch"), FIT("Fit (letterbox)"), FILL("Fill (crop)");
+        STRETCH("Stretch"), FIT("Fit (letterbox)"), FILL("Fill (crop)"),
+        /** No scaling: the frame is exactly 320×200 source pixels; smaller pictures get a border. */
+        NONE("1:1 (320×200 frame)");
         private final String label;
         ScaleMode(String l) { label = l; }
         @Override public String toString() { return de.mulej.i18n.I18n.tr("scale." + name()); }
@@ -38,6 +40,35 @@ public final class ImageFitter {
     public record Settings(Rectangle crop, ScaleMode mode, Filter filter, Aspect aspect, Color fill) {
         public static Settings defaults() { return new Settings(null, ScaleMode.FIT, Filter.AREA, Aspect.PAL, Color.BLACK); }
         public Settings withCrop(Rectangle r) { return new Settings(r, mode, filter, aspect, fill); }
+
+        /**
+         * Starting point for a picture that is not C64-sized: larger pictures get the largest centered frame with
+         * the target aspect (scaled down), smaller ones are scaled up to fit (bicubic). Pictures that fit 320×200 by a whole-number
+         * factor are enlarged exactly with nearest neighbour, so pixel art stays crisp.
+         */
+        public static Settings suggested(BufferedImage img) {
+            int w = img.getWidth(), h = img.getHeight();
+            Settings d = defaults();
+            if (w >= W && h >= H) {
+                double a = d.aspect().ratio;
+                int cw = w, ch = h;
+                if ((double) w / h > a) cw = (int) Math.round(h * a);
+                else ch = (int) Math.round(w / a);
+                return new Settings(new Rectangle((w - cw) / 2, (h - ch) / 2, cw, ch), ScaleMode.FILL,
+                        Filter.AREA, d.aspect(), d.fill());
+            }
+            // whole-number factor, square pixels or multicolor pixels (double width), e.g. 160×100 or 80×100
+            boolean integer = W % w == 0 && H % h == 0 && (W / w == H / h || W / w == 2 * (H / h));
+            if (integer) return new Settings(null, ScaleMode.STRETCH, Filter.NEAREST, Aspect.FREE, d.fill());
+            return new Settings(null, ScaleMode.FIT, Filter.BICUBIC, d.aspect(), d.fill());
+        }
+
+        /** 1:1 frame of 320×200 source pixels, centered. */
+        public static Settings oneToOne(BufferedImage img) {
+            Settings d = defaults();
+            return new Settings(new Rectangle((img.getWidth() - W) / 2, (img.getHeight() - H) / 2, W, H),
+                    ScaleMode.NONE, Filter.NEAREST, Aspect.SQUARE, d.fill());
+        }
     }
 
     private ImageFitter() {}
@@ -50,6 +81,7 @@ public final class ImageFitter {
     public static BufferedImage fit(BufferedImage src, Settings s) {
         // C64-sized pictures are taken 1:1 (160 wide = multicolor, pixels get doubled)
         if (s.crop() == null && isNativeSize(src)) return scale(src, W, H, Filter.NEAREST);
+        if (s.mode() == ScaleMode.NONE) return oneToOne(src, s);
 
         Rectangle c = s.crop() != null ? s.crop().intersection(new Rectangle(0, 0, src.getWidth(), src.getHeight()))
                 : new Rectangle(0, 0, src.getWidth(), src.getHeight());
@@ -72,6 +104,19 @@ public final class ImageFitter {
             int dh = Math.max(1, (int) Math.round(cropped.getHeight() * sc));
             g.drawImage(scale(cropped, dw, dh, s.filter()), (W - dw) / 2, (H - dh) / 2, null);
         }
+        g.dispose();
+        return out;
+    }
+
+    /** Copies the 320×200 frame without scaling; parts outside the picture get the fill colour. */
+    private static BufferedImage oneToOne(BufferedImage src, Settings s) {
+        Rectangle c = s.crop() != null ? s.crop()
+                : new Rectangle((src.getWidth() - W) / 2, (src.getHeight() - H) / 2, W, H);
+        BufferedImage out = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = out.createGraphics();
+        g.setColor(s.fill());
+        g.fillRect(0, 0, W, H);
+        g.drawImage(src, -c.x, -c.y, null);
         g.dispose();
         return out;
     }

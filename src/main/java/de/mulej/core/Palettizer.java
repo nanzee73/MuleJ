@@ -36,6 +36,18 @@ public final class Palettizer {
         return palettize(src, palette, new ColorMatcher(palette, space, 50, 50, false));
     }
 
+    /** Palette indices with optional dithering (all 16 colours allowed everywhere). */
+    public static int[] indices(BufferedImage src, Palette palette, ColorMatcher m, Ditherer.Settings dither) {
+        if (dither == null || !dither.active()) return indices(src, m);
+        return Ditherer.run(Ditherer.toFloat(src), src.getWidth(), src.getHeight(), m, palette, dither, null, 1, 1);
+    }
+
+    public static BufferedImage palettize(BufferedImage src, Palette palette, ColorMatcher.Space space,
+                                          Ditherer.Settings dither) {
+        ColorMatcher m = new ColorMatcher(palette, space, 50, 50, false);
+        return render(indices(src, palette, m, dither), src.getWidth(), src.getHeight(), palette);
+    }
+
     /** Draws an index map with the given palette. */
     public static BufferedImage render(int[] idx, int w, int h, Palette palette) {
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);

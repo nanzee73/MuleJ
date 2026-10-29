@@ -33,6 +33,9 @@ public class ImagePanel extends JPanel {
     /** Notified whenever zoom or pan changes. */
     public interface ViewListener { void viewChanged(ImagePanel source); }
 
+    /** Left click / left drag on a picture pixel (outside the crop mode). */
+    public interface PixelListener { void pixel(int x, int y, boolean dragging); }
+
     /** Callbacks of the crop mode. */
     public interface CropListener {
         void cropChanged(Rectangle crop);
@@ -49,11 +52,14 @@ public class ImagePanel extends JPanel {
     private final List<ViewListener> listeners = new ArrayList<>();
     private boolean showGrid = true;
     private Runnable rightClickAction;
+    private PixelListener pixelListener;
 
     // crop mode
     private BufferedImage cropSource;
     private Rectangle2D.Double crop;
     private double cropAspect;
+    /** 1:1 frame: fixed size, the mouse wheel zooms instead of resizing. */
+    private boolean cropFixed;
     private CropListener cropListener;
     private BufferedImage savedImage;
     private double savedAspect;
@@ -67,7 +73,7 @@ public class ImagePanel extends JPanel {
 
             @Override public void mouseWheelMoved(MouseWheelEvent e) {
                 if (image == null) return;
-                if (isCropMode() && !e.isControlDown()) {
+                if (isCropMode() && !e.isControlDown() && !cropFixed) {
                     resizeCrop(Math.pow(1.08, e.getPreciseWheelRotation()), e.getPoint());
                     return;
                 }
@@ -83,6 +89,8 @@ public class ImagePanel extends JPanel {
                 } else if (SwingUtilities.isLeftMouseButton(e) && isCropMode()) {
                     movingCrop = true;
                     setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                } else if (SwingUtilities.isLeftMouseButton(e)) {
+                    firePixel(e.getPoint(), false);
                 }
             }
 
@@ -99,6 +107,8 @@ public class ImagePanel extends JPanel {
                         fire();
                     } else if (movingCrop) {
                         moveCrop(dx * cropSource.getWidth(), dy * cropSource.getHeight());
+                    } else if (SwingUtilities.isLeftMouseButton(e) && !isCropMode()) {
+                        firePixel(e.getPoint(), true);
                     }
                 }
                 last = e.getPoint();
@@ -114,11 +124,13 @@ public class ImagePanel extends JPanel {
                 pressedAt = null;
                 panning = false;
                 movingCrop = false;
-                setCursor(Cursor.getDefaultCursor());
+                setCursor(pixelListener != null && !isCropMode() ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)
+                        : Cursor.getDefaultCursor());
             }
 
             @Override public void mouseClicked(MouseEvent e) {
-                if (SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 2) fit();
+                // while editing, left clicks belong to the editor
+                if (SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 2 && pixelListener == null) fit();
             }
         };
         addMouseListener(ma);
@@ -139,6 +151,29 @@ public class ImagePanel extends JPanel {
     }
 
     public void addViewListener(ViewListener l) { listeners.add(l); }
+
+    /** Left clicks on the picture report the pixel (crosshair cursor); null switches it off. */
+    public void setPixelListener(PixelListener l) {
+        pixelListener = l;
+        setCursor(l != null ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR) : Cursor.getDefaultCursor());
+    }
+
+    private void firePixel(Point p, boolean dragging) {
+        if (pixelListener == null || image == null) return;
+        Point2D f = toPicture(p);
+        int x = (int) Math.floor(f.getX() * image.getWidth()), y = (int) Math.floor(f.getY() * image.getHeight());
+        if (x >= 0 && y >= 0 && x < image.getWidth() && y < image.getHeight()) pixelListener.pixel(x, y, dragging);
+    }
+
+    /** Shows the given picture area (in pixels) centered, zoomed in at least to {@code minZoom}. */
+    public void showArea(Rectangle area, double minZoom) {
+        if (image == null || isCropMode()) return;
+        zoom = Math.max(zoom, Math.min(MAX_ZOOM, minZoom));
+        centerX = area.getCenterX() / image.getWidth();
+        centerY = area.getCenterY() / image.getHeight();
+        clampCenter();
+        fire();
+    }
 
     /** Action for a right click without dragging (outside of crop mode). */
     public void setRightClickAction(Runnable r) { this.rightClickAction = r; }
@@ -226,7 +261,15 @@ public class ImagePanel extends JPanel {
      * @param frameAspect width/height of the frame in source pixels
      */
     public void startCrop(BufferedImage full, Rectangle initial, double frameAspect, CropListener l) {
+        startCrop(full, initial, frameAspect, false, l);
+    }
+
+    /**
+     * @param fixedSize keep the size of {@code initial} (1:1 frame); it must fit into the picture
+     */
+    public void startCrop(BufferedImage full, Rectangle initial, double frameAspect, boolean fixedSize, CropListener l) {
         if (isCropMode()) return;
+        cropFixed = fixedSize && initial != null;
         savedImage = image;
         savedAspect = aspect;
         cropSource = full;
@@ -422,7 +465,7 @@ public class ImagePanel extends JPanel {
         g2.drawLine(fx + fw / 2 - 6, fy + fh / 2, fx + fw / 2 + 6, fy + fh / 2);
 
         // hint box at the bottom; split into two lines when the panel is too narrow
-        String hint = I18n.tr("preview.reframeHint");
+        String hint = I18n.tr(cropFixed ? "preview.reframeHintFixed" : "preview.reframeHint");
         g2.setFont(g2.getFont().deriveFont(11f));
         FontMetrics fm = g2.getFontMetrics();
         List<String> lines = new ArrayList<>(List.of(hint));

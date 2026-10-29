@@ -79,6 +79,38 @@ public final class KoalaImage {
         return out;
     }
 
+    /**
+     * Same byte layout as the old c64koalaverter: the cell colours sorted by colour index go to
+     * screen low nibble (bits 10), screen high nibble (bits 01) and colour RAM (bits 11).
+     * The cells must not use more than 3 colours besides the background.
+     */
+    public static KoalaImage encode(int[] idx, int bg) {
+        KoalaImage k = new KoalaImage();
+        k.background = bg;
+        for (int cell = 0; cell < CELLS; cell++) {
+            int cx = (cell % COLS) * 4, cy = (cell / COLS) * 8;
+            int[] count = new int[16];
+            for (int y = 0; y < 8; y++) for (int x = 0; x < 4; x++) count[idx[(cy + y) * 160 + cx + x]]++;
+            count[bg] = 0;
+            int[] cols = new int[3];
+            int n = 0;
+            for (int i = 0; i < 16 && n < 3; i++) if (count[i] > 0) cols[n++] = i;
+            int lo = n >= 1 ? cols[0] : 0, hi = n >= 2 ? cols[1] : 0, cr = n >= 3 ? cols[2] : 0;
+            k.screen[cell] = (byte) ((hi << 4) | lo);
+            k.colorRam[cell] = (byte) cr;
+            for (int y = 0; y < 8; y++) {
+                int b = 0;
+                for (int x = 0; x < 4; x++) {
+                    int c = idx[(cy + y) * 160 + cx + x];
+                    int bits = c == bg ? 0 : n >= 1 && c == cols[0] ? 2 : n >= 2 && c == cols[1] ? 1 : 3;
+                    b = (b << 2) | bits;
+                }
+                k.bitmap[cell * 8 + y] = (byte) b;
+            }
+        }
+        return k;
+    }
+
     @Override public boolean equals(Object o) {
         return o instanceof KoalaImage k && Arrays.equals(toBytes(), k.toBytes());
     }

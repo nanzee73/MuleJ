@@ -1,0 +1,110 @@
+# Builds MuleJ for Windows, macOS and Linux.
+#
+#   git tag v1.0.0 && git push origin v1.0.0   → builds everything and publishes a GitHub release with the files
+#   Actions tab ▸ "Build installers" ▸ Run workflow → builds everything, files are attached to the run (no release)
+#
+# Files: Windows .msi + portable .zip, macOS .dmg (Apple Silicon), Linux .deb + portable .tar.gz,
+# and mulej-<version>-all.jar for every system with Java 17+.
+name: Build installers
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            types: deb app-image
+          - os: windows-latest
+            types: msi app-image
+          - os: macos-latest
+            types: dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Version from tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "APP_VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
+          else
+            echo "APP_VERSION=$(grep '^version' build.gradle.kts | cut -d'"' -f2)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Tools for .deb (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+
+      - name: WiX toolset for .msi (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install wixtoolset --version=3.14.1 -y --no-progress
+          "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Tests
+        shell: bash
+        run: ./gradlew test
+
+      - name: Installers
+        shell: bash
+        run: |
+          for t in ${{ matrix.types }}; do
+            ./gradlew jpackage -PinstallerType=$t -PappVersion="$APP_VERSION"
+          done
+
+      - name: Pack portable versions
+        shell: bash
+        run: |
+          cd build/installer
+          if [ -d MuleJ ]; then
+            if [ "$RUNNER_OS" = "Windows" ]; then
+              7z a "MuleJ-$APP_VERSION-windows-portable.zip" MuleJ > /dev/null
+            else
+              tar czf "MuleJ-$APP_VERSION-linux-portable.tar.gz" MuleJ
+            fi
+            rm -rf MuleJ
+          fi
+          for f in *.dmg; do [ -e "$f" ] && mv "$f" "MuleJ-$APP_VERSION-macos-arm64.dmg"; done
+          ls -la
+
+      - name: Runnable jar (Linux job only)
+        if: runner.os == 'Linux'
+        run: |
+          ./gradlew shadowJar
+          cp build/libs/mulej-*-all.jar build/installer/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mulej-${{ runner.os }}
+          path: build/installer/*
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

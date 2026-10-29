@@ -36,6 +36,7 @@ public class CropScaleDialog extends JDialog {
         this.crop = initial.crop() != null ? new Rectangle(initial.crop())
                 : new Rectangle(0, 0, source.getWidth(), source.getHeight());
         this.fill = initial.fill();
+        this.lastMode = initial.mode();
         aspectBox.setSelectedItem(initial.aspect());
         modeBox.setSelectedItem(initial.mode());
         filterBox.setSelectedItem(initial.filter());
@@ -63,8 +64,11 @@ public class CropScaleDialog extends JDialog {
         c.gridx = 0; c.gridwidth = 2;
         JButton whole = new JButton(tr("crop.whole"));
         JButton center = new JButton(tr("crop.center"));
+        JButton oneToOne = new JButton(tr("crop.oneToOne"));
+        oneToOne.setToolTipText(tr("crop.oneToOne.tip"));
         side.add(whole, c); c.gridy++;
         side.add(center, c); c.gridy++;
+        side.add(oneToOne, c); c.gridy++;
         side.add(new JLabel(tr("crop.preview")), c); c.gridy++;
         preview.setPreferredSize(new Dimension(320, 200));
         side.add(preview, c); c.gridy++;
@@ -78,14 +82,23 @@ public class CropScaleDialog extends JDialog {
 
         ok.addActionListener(e -> { accepted = true; dispose(); });
         cancel.addActionListener(e -> dispose());
-        whole.addActionListener(e -> { crop = new Rectangle(0, 0, source.getWidth(), source.getHeight()); refresh(); });
-        center.addActionListener(e -> { crop = maxCentered(); refresh(); });
+        whole.addActionListener(e -> {
+            if (fixed()) modeBox.setSelectedItem(ImageFitter.ScaleMode.FIT);
+            crop = new Rectangle(0, 0, source.getWidth(), source.getHeight());
+            refresh();
+        });
+        center.addActionListener(e -> {
+            if (fixed()) modeBox.setSelectedItem(ImageFitter.ScaleMode.FILL);
+            crop = maxCentered();
+            refresh();
+        });
+        oneToOne.addActionListener(e -> modeBox.setSelectedItem(ImageFitter.ScaleMode.NONE));
         fillButton.addActionListener(e -> {
             Color chosen = JColorChooser.showDialog(this, tr("crop.border").replace("…", ""), fill);
             if (chosen != null) { fill = chosen; refresh(); }
         });
         aspectBox.addActionListener(e -> refresh());
-        modeBox.addActionListener(e -> refresh());
+        modeBox.addActionListener(e -> modeChanged());
         filterBox.addActionListener(e -> refresh());
         for (JSpinner s : new JSpinner[]{sx, sy, sw, sh}) s.addChangeListener(e -> fromSpinners());
 
@@ -102,6 +115,24 @@ public class CropScaleDialog extends JDialog {
     }
 
     public boolean isAccepted() { return accepted; }
+
+    /** 1:1 mode: the frame is exactly 320×200 source pixels and can only be moved. */
+    private boolean fixed() { return modeBox.getSelectedItem() == ImageFitter.ScaleMode.NONE; }
+
+    private ImageFitter.ScaleMode lastMode;
+
+    private void modeChanged() {
+        boolean nowFixed = fixed(), wasFixed = lastMode == ImageFitter.ScaleMode.NONE;
+        if (nowFixed && !wasFixed) {
+            // keep the centre of the current frame
+            crop = clampRect(new Rectangle((int) Math.round(crop.getCenterX()) - ImageFitter.W / 2,
+                    (int) Math.round(crop.getCenterY()) - ImageFitter.H / 2, ImageFitter.W, ImageFitter.H));
+        } else if (!nowFixed && wasFixed) {
+            crop = maxCentered();
+        }
+        lastMode = (ImageFitter.ScaleMode) modeBox.getSelectedItem();
+        refresh();
+    }
 
     public ImageFitter.Settings getSettings() {
         Rectangle r = crop.equals(new Rectangle(0, 0, source.getWidth(), source.getHeight())) ? null : new Rectangle(crop);
@@ -132,6 +163,13 @@ public class CropScaleDialog extends JDialog {
     }
 
     private Rectangle clampRect(Rectangle r) {
+        if (fixed()) {
+            // the frame may be larger than the picture (then the rest gets the border colour)
+            int w = ImageFitter.W, h = ImageFitter.H, dw = source.getWidth() - w, dh = source.getHeight() - h;
+            int x = Math.max(Math.min(0, dw), Math.min(Math.max(0, dw), r.x));
+            int y = Math.max(Math.min(0, dh), Math.min(Math.max(0, dh), r.y));
+            return new Rectangle(x, y, w, h);
+        }
         int w = Math.max(1, Math.min(r.width, source.getWidth()));
         int h = Math.max(1, Math.min(r.height, source.getHeight()));
         int x = Math.max(0, Math.min(r.x, source.getWidth() - w));
@@ -141,10 +179,20 @@ public class CropScaleDialog extends JDialog {
 
     private void refresh() {
         updating = true;
-        sx.setModel(new SpinnerNumberModel(crop.x, 0, source.getWidth() - 1, 1));
-        sy.setModel(new SpinnerNumberModel(crop.y, 0, source.getHeight() - 1, 1));
-        sw.setModel(new SpinnerNumberModel(crop.width, 1, source.getWidth(), 1));
-        sh.setModel(new SpinnerNumberModel(crop.height, 1, source.getHeight(), 1));
+        boolean f = fixed();
+        int minX = f ? Math.min(0, source.getWidth() - ImageFitter.W) : 0;
+        int minY = f ? Math.min(0, source.getHeight() - ImageFitter.H) : 0;
+        int maxX = f ? Math.max(0, source.getWidth() - ImageFitter.W) : source.getWidth() - 1;
+        int maxY = f ? Math.max(0, source.getHeight() - ImageFitter.H) : source.getHeight() - 1;
+        sx.setModel(new SpinnerNumberModel(crop.x, minX, maxX, 1));
+        sy.setModel(new SpinnerNumberModel(crop.y, minY, maxY, 1));
+        sw.setModel(new SpinnerNumberModel(crop.width, 1, Math.max(crop.width, source.getWidth()), 1));
+        sh.setModel(new SpinnerNumberModel(crop.height, 1, Math.max(crop.height, source.getHeight()), 1));
+        sw.setEnabled(!f);
+        sh.setEnabled(!f);
+        aspectBox.setEnabled(!f);
+        filterBox.setEnabled(!f);
+        lockAspect.setEnabled(!f);
         updating = false;
         preview.setImage(ImageFitter.fit(source, getSettings()));
         view.repaint();
@@ -164,7 +212,14 @@ public class CropScaleDialog extends JDialog {
                     dragOrig = new Rectangle(crop);
                     Point corner = new Point(crop.x + crop.width, crop.y + crop.height);
                     double handle = 8 / scale();
-                    if (p.distance(corner) < handle) dragMode = 2;
+                    if (fixed()) {
+                        if (!crop.contains(p)) {
+                            crop = clampRect(new Rectangle(p.x - crop.width / 2, p.y - crop.height / 2, crop.width, crop.height));
+                            dragOrig = new Rectangle(crop);
+                            refresh();
+                        }
+                        dragMode = 1;
+                    } else if (p.distance(corner) < handle) dragMode = 2;
                     else if (crop.contains(p)) dragMode = 1;
                     else dragMode = 3;
                 }
@@ -198,13 +253,22 @@ public class CropScaleDialog extends JDialog {
             return new Rectangle(x, y, w, h);
         }
 
-        private double scale() {
-            return Math.min((double) getWidth() / source.getWidth(), (double) getHeight() / source.getHeight());
+        /** Area shown: the picture, plus a 1:1 frame that sticks out of a small picture. */
+        private Rectangle shownArea() {
+            Rectangle b = new Rectangle(0, 0, source.getWidth(), source.getHeight());
+            return fixed() ? b.union(crop) : b;
         }
 
+        private double scale() {
+            Rectangle b = shownArea();
+            return Math.min((double) getWidth() / b.width, (double) getHeight() / b.height);
+        }
+
+        /** Screen position of picture pixel (0,0). */
         private Point offset() {
             double s = scale();
-            return new Point((int) ((getWidth() - source.getWidth() * s) / 2), (int) ((getHeight() - source.getHeight() * s) / 2));
+            Rectangle b = shownArea();
+            return new Point((int) ((getWidth() - b.width * s) / 2 - b.x * s), (int) ((getHeight() - b.height * s) / 2 - b.y * s));
         }
 
         private Point toImage(Point p) {
@@ -220,6 +284,11 @@ public class CropScaleDialog extends JDialog {
             double s = scale();
             Point o = offset();
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            if (fixed()) {
+                // border colour where the 1:1 frame is larger than the picture
+                g2.setColor(fill);
+                g2.fillRect(o.x + (int) (crop.x * s), o.y + (int) (crop.y * s), (int) (crop.width * s), (int) (crop.height * s));
+            }
             g2.drawImage(source, o.x, o.y, (int) (source.getWidth() * s), (int) (source.getHeight() * s), null);
             int rx = o.x + (int) (crop.x * s), ry = o.y + (int) (crop.y * s);
             int rw = (int) (crop.width * s), rh = (int) (crop.height * s);
@@ -229,7 +298,7 @@ public class CropScaleDialog extends JDialog {
             outside.fill(g2);
             g2.setColor(Color.YELLOW);
             g2.drawRect(rx, ry, rw, rh);
-            g2.fillRect(rx + rw - 4, ry + rh - 4, 8, 8);
+            if (!fixed()) g2.fillRect(rx + rw - 4, ry + rh - 4, 8, 8);
             g2.dispose();
         }
     }
