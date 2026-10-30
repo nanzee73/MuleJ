@@ -152,7 +152,11 @@ The installers and portable versions contain their own Java runtime – nothing 
 1. Set `version` in `build.gradle.kts` and `VERSION` in `App.java`.
 2. `git tag v1.0.0 && git push origin v1.0.0`
 3. GitHub Actions (`.github/workflows/release.yml`) builds and tests on Windows, macOS and Linux and publishes a release
-   with all files above. *Actions ▸ Build installers ▸ Run workflow* builds the same files without a release.
+   with all files above. *Actions ▸ Build & Release ▸ Run workflow* builds the same files without a release.
+
+**Development build:** every push to `main` that changes code or build files replaces the pre-release
+*Development build* (tag `latest-dev`) on the Releases page with fresh packages (`…-dev-…` in the file names).
+Changes to the README or other documents build nothing.
 
 Note: jpackage on macOS does not accept versions starting with 0, so `0.x.y` becomes `1.x.y` in the `.dmg` only.
 Use tags from `v1.0.0` on to keep the versions identical everywhere.
