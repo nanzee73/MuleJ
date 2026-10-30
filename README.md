@@ -137,6 +137,7 @@ Download from the GitHub **Releases** page:
 |---|---|---|
 | Windows | `MuleJ-x.y.z-windows-x64.msi` | Install, then *Start menu ▸ MuleJ*. Command line: `"C:\Program Files\MuleJ\mulej-cli.exe" --help` |
 | Windows (no installation) | `MuleJ-x.y.z-windows-x64-portable.zip` | Unpack, run `MuleJ\MuleJ.exe` |
+| Windows 32-bit | `MuleJ-x.y.z-windows-x86.msi` / `-windows-x86-portable.zip` | as above |
 | macOS (Apple Silicon) | `MuleJ-x.y.z-macos-arm64.dmg` | Drag MuleJ into *Applications*. The app is not signed: the first time right click ▸ *Open*. Command line: `/Applications/MuleJ.app/Contents/MacOS/mulej-cli` |
 | macOS (Intel) | `MuleJ-x.y.z-macos-x64.dmg` | as above |
 | Linux (Debian/Ubuntu) | `MuleJ-x.y.z-linux-x64.deb` | `sudo apt install ./MuleJ-x.y.z-linux-x64.deb`, then the menu entry *MuleJ* or `/opt/mulej/bin/MuleJ`; command line `/opt/mulej/bin/mulej-cli` |

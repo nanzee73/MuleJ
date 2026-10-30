@@ -108,7 +108,7 @@ val jpackage by tasks.registering(Exec::class) {
         "--input", lib.path, "--main-jar", "mulej-${project.version}.jar", "--main-class", "de.mulej.App",
         "--dest", dest.path, "--icon", icon,
         "--add-launcher", "mulej-cli=packaging/cli-launcher.properties",
-        "--java-options", "-Xmx1g",
+        "--java-options", "-Xmx" + (providers.gradleProperty("maxHeap").orNull?.takeIf { it.isNotBlank() } ?: "1g"),
         // a small runtime: only the modules MuleJ needs
         "--add-modules", "java.desktop,java.prefs,java.xml,java.logging,jdk.unsupported",
         "--jlink-options", "--strip-debug --no-header-files --no-man-pages --strip-native-commands",
