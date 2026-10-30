@@ -17,7 +17,7 @@ repositories {
     maven("https://jitpack.io") { content { includeGroupByRegex("com\\.github\\.nanzee73.*") } }
 }
 
-val c64gfxVersion = "0.1.0"
+val c64gfxVersion = "0.2.0"
 
 val twelveMonkeys = "3.12.0"
 
@@ -62,6 +62,10 @@ tasks.shadowJar {
     mergeServiceFiles()
 }
 
+// License texts inside the jars and next to the start scripts
+tasks.withType<Jar>().configureEach { from("LICENSE", "THIRD-PARTY-NOTICES.md") { into("META-INF") } }
+distributions { main { contents { from("LICENSE", "THIRD-PARTY-NOTICES.md") } } }
+
 tasks.test {
     useJUnitPlatform()
     maxHeapSize = "1g"
@@ -104,7 +108,7 @@ val jpackage by tasks.registering(Exec::class) {
     val args = mutableListOf(
         "jpackage", "--type", type, "--name", "MuleJ", "--app-version", appVersion,
         "--vendor", "nanzee73", "--description", "C64 graphics tools: palettize, pixelize, Koala/Art Studio with colour check",
-        "--copyright", "Copyright (c) 2024-2026 nanzee73, MIT License",
+        "--copyright", "Copyright (c) 2024-2026 nanzee73, PolyForm Noncommercial License 1.0.0",
         "--input", lib.path, "--main-jar", "mulej-${project.version}.jar", "--main-class", "de.mulej.App",
         "--dest", dest.path, "--icon", icon,
         "--add-launcher", "mulej-cli=packaging/cli-launcher.properties",

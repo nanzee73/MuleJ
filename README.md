@@ -192,11 +192,10 @@ low nibble = cleared bits), 7 bytes filler (the first is used as border colour b
 
 ## License
 
-MIT License (see `LICENSE`): you may use, copy, change, sell and pass on MuleJ in any way, as long as the copyright
-notice and the license text stay with every copy and every program based on it – that names the original.
-The old tools c64palettizer, c64pixelizer, c64koalaverter and c64helpers are under the same license.
-`src/main/resources/de/mulej/charset/` holds the C64 character set data (C64 character ROM, © Commodore) as shipped with
-Petmate (MIT License, © C. T. Lin).
+MuleJ may be used, copied, changed and passed on for **noncommercial purposes only**, under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). For commercial use ask nanzee73 for permission.
+Parts by others keep their own licenses, see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+The old tools c64palettizer, c64pixelizer, c64koalaverter and c64helpers stay under the MIT License.
 
 ## Project layout
 
