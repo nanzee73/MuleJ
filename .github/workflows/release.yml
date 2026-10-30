@@ -15,10 +15,6 @@ on:
 permissions:
   contents: write
 
-env:
-  # C64GfxLib from GitHub Packages: repository secret with a classic token (scope read:packages)
-  C64GFX_TOKEN: ${{ secrets.C64GFX_TOKEN }}
-
 jobs:
   build:
     strategy:
