@@ -140,6 +140,7 @@ Download from the GitHub **Releases** page:
 | macOS (Apple Silicon) | `MuleJ-…-macos-arm64.dmg` | Drag MuleJ into *Applications*. The app is not signed: the first time right click ▸ *Open*. Command line: `/Applications/MuleJ.app/Contents/MacOS/mulej-cli` |
 | Linux (Debian/Ubuntu) | `mulej_x.y.z-1_amd64.deb` | `sudo apt install ./mulej_….deb`, then the menu entry *MuleJ* or `/opt/mulej/bin/MuleJ`; command line `/opt/mulej/bin/mulej-cli` |
 | Linux (others, no installation) | `MuleJ-…-linux-portable.tar.gz` | Unpack, run `MuleJ/bin/MuleJ` |
+| Any system with Java 17+ | `MuleJ-x.y.z-all-platforms-java17.zip` | Unpack, run `bin/mulej` (Linux, macOS) or `bin\mulej.bat` (Windows); with arguments it runs the command line |
 | Any system with Java 17+ | `mulej-x.y.z-all.jar` | `java -jar mulej-x.y.z-all.jar` (GUI) or `java -jar mulej-x.y.z-all.jar koala bild.png` |
 
 The installers and portable versions contain their own Java runtime – nothing else needs to be installed.

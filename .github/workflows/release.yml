@@ -4,7 +4,8 @@
 #   Actions tab ▸ "Build installers" ▸ Run workflow → builds everything, files are attached to the run (no release)
 #
 # Files: Windows .msi + portable .zip, macOS .dmg (Apple Silicon), Linux .deb + portable .tar.gz,
-# and mulej-<version>-all.jar for every system with Java 17+.
+# and for every system with Java 17+: mulej-<version>-all.jar (java -jar) and
+# MuleJ-<version>-all-platforms-java17.zip (start scripts bin/mulej and bin/mulej.bat).
 name: Build installers
 
 on:
@@ -44,7 +45,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "APP_VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
           else
-            echo "APP_VERSION=$(grep '^version' build.gradle.kts | cut -d'"' -f2)" >> "$GITHUB_ENV"
+            echo "APP_VERSION=$(grep '^version' build.gradle.kts | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1)" >> "$GITHUB_ENV"
           fi
 
       - name: Tools for .deb (Linux)
@@ -92,11 +93,12 @@ jobs:
           for f in *.dmg; do [ -e "$f" ] && mv "$f" "MuleJ-$APP_VERSION-macos-arm64.dmg"; done
           ls -la
 
-      - name: Runnable jar (Linux job only)
+      - name: Runnable jar and zip with start scripts (Linux job only, both need Java 17+)
         if: runner.os == 'Linux'
         run: |
-          ./gradlew shadowJar
+          ./gradlew shadowJar distZip -PappVersion="$APP_VERSION"
           cp build/libs/mulej-*-all.jar build/installer/
+          cp "build/distributions/mulej-$APP_VERSION.zip" "build/installer/MuleJ-$APP_VERSION-all-platforms-java17.zip"
 
       - uses: actions/upload-artifact@v4
         with:

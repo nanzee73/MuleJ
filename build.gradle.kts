@@ -7,7 +7,8 @@ plugins {
 }
 
 group = "de.mulej"
-version = "0.1.0"
+// The installer workflow passes the tag version, e.g. -PappVersion=1.2.0 for tag v1.2.0.
+version = (findProperty("appVersion") as String?) ?: "0.1.0"
 
 repositories {
     mavenCentral()
