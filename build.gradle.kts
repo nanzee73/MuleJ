@@ -50,6 +50,7 @@ application {
 }
 
 tasks.jar {
+    archiveBaseName.set("mulej")   // lower case like the jpackage --main-jar (Linux file names are case-sensitive)
     manifest { attributes("Main-Class" to "de.mulej.App", "Implementation-Version" to project.version) }
 }
 
