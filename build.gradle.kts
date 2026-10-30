@@ -63,7 +63,7 @@ tasks.shadowJar {
 }
 
 // License texts inside the jars and next to the start scripts
-tasks.withType<Jar>().configureEach { from("LICENSE", "THIRD-PARTY-NOTICES.md") { into("META-INF") } }
+tasks.withType<Jar>().configureEach { from(files("LICENSE", "THIRD-PARTY-NOTICES.md")) { into("META-INF") } }
 distributions { main { contents { from("LICENSE", "THIRD-PARTY-NOTICES.md") } } }
 
 tasks.test {

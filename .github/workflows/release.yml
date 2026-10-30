@@ -78,7 +78,11 @@ jobs:
       - name: Tests
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon -PappVersion=$APP_VERSION test
+          set -o pipefail
+          if ! ./gradlew --no-daemon -PappVersion=$APP_VERSION test 2>&1 | tee gradle.log; then
+            grep -E "What went wrong|e: |error:|FAILED|Exception|> " gradle.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          fi
 
       - name: Jar and zip with start scripts (need installed Java 17+)
         if: runner.os == 'Linux'
