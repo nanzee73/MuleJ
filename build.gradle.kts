@@ -12,12 +12,13 @@ version = "0.1.0"
 repositories {
     mavenCentral()
     // C64GfxLib (shared code with FlipperJ) from GitHub Packages. Login: gpr.user / gpr.key in
-    // ~/.gradle/gradle.properties on your computer, GITHUB_ACTOR / GITHUB_TOKEN in GitHub Actions.
+    // ~/.gradle/gradle.properties on your computer; in GitHub Actions the secret C64GFX_TOKEN
+    // (a classic token with read:packages – the workflow's own GITHUB_TOKEN cannot read another repo's Maven package).
     maven {
         url = uri("https://maven.pkg.github.com/nanzee73/C64GfxLib")
         credentials {
             username = (findProperty("gpr.user") as String?) ?: System.getenv("GITHUB_ACTOR")
-            password = (findProperty("gpr.key") as String?) ?: System.getenv("GITHUB_TOKEN")
+            password = (findProperty("gpr.key") as String?) ?: System.getenv("C64GFX_TOKEN")
         }
     }
 }

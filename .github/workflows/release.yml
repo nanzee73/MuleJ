@@ -14,10 +14,10 @@ on:
 
 permissions:
   contents: write
-  packages: read      # C64GfxLib from GitHub Packages
 
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # C64GfxLib from GitHub Packages: repository secret with a classic token (scope read:packages)
+  C64GFX_TOKEN: ${{ secrets.C64GFX_TOKEN }}
 
 jobs:
   build:

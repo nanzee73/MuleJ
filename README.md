@@ -161,6 +161,8 @@ crop & scale, translations of shared texts and more come from [C64GfxLib](https:
 (also used by FlipperJ), via GitHub Packages.
 Building needs a login once, see *Access to the package* in the C64GfxLib README:
 `gpr.user` / `gpr.key` (token with `read:packages`) in `~/.gradle/gradle.properties`.
+The release workflow needs the same token as repository secret `C64GFX_TOKEN`
+(*Settings ▸ Secrets and variables ▸ Actions ▸ New repository secret*).
 To work on the library at the same time, check it out next to MuleJ and build with `-Pc64gfxLocal`.
 
 ## Build
