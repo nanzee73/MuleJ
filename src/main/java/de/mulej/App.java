@@ -11,7 +11,13 @@ import java.util.Locale;
 /** Entry point: without arguments the GUI starts, with arguments the command line tools run. */
 public final class App {
     public static final String NAME = "MuleJ";
-    public static final String VERSION = "0.1.0";
+    /** From the jar manifest (set by the build: tag version, "dev-<commit>" or the version in build.gradle.kts). */
+    public static final String VERSION = version();
+
+    private static String version() {
+        String v = App.class.getPackage() != null ? App.class.getPackage().getImplementationVersion() : null;
+        return v != null ? v : "dev";
+    }
 
     private App() {}
 

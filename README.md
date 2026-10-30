@@ -149,9 +149,9 @@ The installers and portable versions contain their own Java runtime – nothing 
 
 ## Releasing a new version (for the developer)
 
-1. Set `version` in `build.gradle.kts` and `VERSION` in `App.java`.
-2. `git tag v1.0.0 && git push origin v1.0.0`
-3. GitHub Actions (`.github/workflows/release.yml`) builds and tests on Windows, macOS and Linux and publishes a release
+1. `git tag v1.0.0 && git push origin v1.0.0` – the tag sets the version everywhere (file names, installers,
+   title bar); `build.gradle.kts` only holds the version for local builds.
+2. GitHub Actions (`.github/workflows/release.yml`) builds and tests on Windows, macOS and Linux and publishes a release
    with all files above. *Actions ▸ Build & Release ▸ Run workflow* builds the same files without a release.
 
 **Development build:** every push to `main` that changes code or build files replaces the pre-release

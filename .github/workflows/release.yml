@@ -79,6 +79,8 @@ jobs:
           echo "APP_VERSION=$V" >> "$GITHUB_ENV"
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then F="$V"; else F="dev"; fi
           echo "FILE_VERSION=$F" >> "$GITHUB_ENV"       # in file names: version of the tag, otherwise "dev"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then D="$V"; else D="dev-${GITHUB_SHA::7}"; fi
+          echo "DISPLAY_VERSION=$D" >> "$GITHUB_ENV"    # shown in the title bar and the About box
           echo "Building version $V"
 
       - name: Tools for .deb (Linux)
