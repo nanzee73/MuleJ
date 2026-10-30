@@ -1274,9 +1274,8 @@ public class MainWindow extends JFrame {
     private void chooseInput() {
         File dir = FileDialogs.lastDir("input");
         if (dir == null && inputFile != null) dir = inputFile.getAbsoluteFile().getParentFile();
-        JFileChooser fc = FileDialogs.chooser("dlg.open.title", dir);
-        FileDialogs.addImageFilters(fc);
-        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) loadInput(fc.getSelectedFile());
+        File f = FileDialogs.openImage(this, dir);     // native dialog on macOS, image filters elsewhere
+        if (f != null) loadInput(f);
     }
 
     /** Loads a picture, finds out where the chain starts and shows that step. */
@@ -1291,9 +1290,8 @@ public class MainWindow extends JFrame {
         FileDialogs.rememberDir("input", f);
         loading = true;
         Path p = f.toPath();
-        if (Images.isKoala(p)) targetButtons.get(Target.MULTICOLOR).setSelected(true);
-        if (Images.isArtStudio(p)) targetButtons.get(Target.HIRES).setSelected(true);
-        if (Images.isC64File(p) && target() == Target.PETSCII) targetButtons.get(Target.MULTICOLOR).setSelected(true);
+        if (Images.isC64File(p))
+            targetButtons.get(Images.isHiresC64File(p) ? Target.HIRES : Target.MULTICOLOR).setSelected(true);
         inputFile = f;
         source = img;
         manualEntry = null;

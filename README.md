@@ -105,7 +105,7 @@ mulej koala photo.jpg --fit fill --space yuv --dither fs --preview check.png --p
 mulej hires image.png --fix-clashes             # -> image.art
 mulej petscii photo.jpg --fit fill --contrast 20 --prg photo.prg   # -> photo.petmate + photo.prg
 mulej check pixelart.png --mode hires --no-palettize   # list every cell that breaks the rules
-mulej topng image.kla                           # -> image.png (also .art and .petmate)
+mulej topng image.kla                           # -> image.png (any C64 picture or .petmate)
 mulej palettize -if image.png                   # the old -if syntax still works
 mulej --help
 ```
@@ -178,6 +178,12 @@ Requires a JDK 17 or newer. IntelliJ IDEA: *File ▸ Open…*, select the folder
 ```
 
 ## File formats
+
+**Input:** every picture Java ImageIO reads (PNG, JPEG, GIF, BMP, WebP, TIFF, …) and C64 pictures from C64GfxLib:
+Koala Painter (`.kla .koa .gig`), Art Studio (`.art .aas .hpi`), Advanced Art Studio (`.ocp .mpic`),
+Drazpaint (`.drz .drp`), Drazlace (`.drl .dlp`), FLI / FLI Designer / FLI Graph / FLI Editor (`.fli .fd2 .bml .flg .fed`),
+AFLI (`.afl`), Gunpaint (`.gun .ifl`), Funpaint (`.fun .fp2`) and FlipperJ's raw files – also compressed.
+They are drawn with the selected palette; interlace pictures are mixed like on screen.
 
 **Koala Painter** (`.kla`): `$6000` load address, 8000 bytes bitmap (cell by cell), 1000 bytes screen RAM,
 1000 bytes colour RAM, 1 byte background. Bit pairs: `00` background, `01` screen RAM high nibble, `10` screen RAM low

@@ -1,7 +1,6 @@
 package de.mulej.core;
 
-import de.c64gfx.format.HiresImage;
-import de.c64gfx.format.KoalaImage;
+import de.c64gfx.format.C64Formats;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -16,12 +15,13 @@ public final class Images {
     private Images() {}
 
     /**
-     * Reads a picture. Koala (.kla/.koa) and Art Studio (.art) files are drawn with the given palette,
-     * everything else goes through ImageIO.
+     * Reads a picture. C64 pictures (Koala, Art Studio, FLI, AFLI, Gunpaint, Funpaint, Drazlace … – see
+     * {@link C64Formats}) are drawn with the given palette, everything else goes through ImageIO.
      */
     public static BufferedImage read(Path file, de.c64gfx.palette.Palette koalaPalette) throws IOException {
-        if (isKoala(file)) return de.c64gfx.swing.Images.fromRgb(KoalaImage.read(Files.readAllBytes(file)).render(koalaPalette), 320, 200);
-        if (isArtStudio(file)) return de.c64gfx.swing.Images.fromRgb(HiresImage.read(Files.readAllBytes(file)).render(koalaPalette), 320, 200);
+        String name = file.getFileName().toString();
+        if (C64Formats.isC64File(name))
+            return de.c64gfx.swing.Images.fromRgb(C64Formats.read(name, Files.readAllBytes(file)).render(koalaPalette), 320, 200);
         BufferedImage img = ImageIO.read(file.toFile());
         if (img == null) throw new IOException(file.getFileName() + " is no readable image file.");
         return toRgb(img);
@@ -32,8 +32,14 @@ public final class Images {
         return n.endsWith(".art") || n.endsWith(".aas") || n.endsWith(".hpi");
     }
 
-    /** A C64 bitmap file MuleJ can read (Koala or Art Studio); it is drawn with the selected palette. */
-    public static boolean isC64File(Path file) { return isKoala(file) || isArtStudio(file); }
+    /** A C64 picture file MuleJ can read (see {@link C64Formats}); it is drawn with the selected palette. */
+    public static boolean isC64File(Path file) { return C64Formats.isC64File(file.getFileName().toString()); }
+
+    /** A C64 hires picture (Art Studio, AFLI): suggests the hires target. */
+    public static boolean isHiresC64File(Path file) {
+        String e = C64Formats.extension(file.getFileName().toString());
+        return isArtStudio(file) || e.equals("afl");
+    }
 
     public static boolean isKoala(Path file) {
         String n = file.getFileName().toString().toLowerCase(Locale.ROOT);

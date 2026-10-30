@@ -17,7 +17,7 @@ repositories {
     maven("https://jitpack.io") { content { includeGroupByRegex("com\\.github\\.nanzee73.*") } }
 }
 
-val c64gfxVersion = "0.2.0"
+val c64gfxVersion = "0.3.0"
 
 val twelveMonkeys = "3.12.0"
 

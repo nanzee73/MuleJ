@@ -38,7 +38,9 @@ public final class Cli {
               hires       hires bitmap (2 colours per 8x8 cell)               -> NAME.art  (Art Studio)
               petscii     text screen: characters + colours, for Petmate       -> NAME.petmate
               check       colour check: list the cells that break the rules of --mode (no file written)
-              topng       Koala (.kla), Art Studio (.art) or Petmate file to PNG -> NAME.png
+              topng       C64 picture or Petmate file to PNG                  -> NAME.png
+                          (Koala, Art Studio, Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph,
+                          AFLI, Gunpaint, Funpaint; interlace pictures are mixed like on screen)
 
             Input can also be given as -if FILE (like the old c64palettizer/pixelizer/koalaverter).
             Output: second argument or -o FILE (pixelize: only with a single --dir).
@@ -249,7 +251,7 @@ public final class Cli {
                         PetsciiImage p = PetsciiImage.fromPetmate(Files.readString(in, java.nio.charset.StandardCharsets.UTF_8));
                         Images.writePng(p.render(pal), target);
                     } else {
-                        if (!Images.isC64File(in)) throw new IllegalArgumentException("topng needs a .kla, .art or .petmate file.");
+                        if (!Images.isC64File(in)) throw new IllegalArgumentException("topng needs a C64 picture (.kla, .art, .fli, .afl, .gun, .fun, .drl, …) or a .petmate file.");
                         Images.writePng(Images.read(in, pal), target);
                     }
                     System.out.println("Wrote " + target);
