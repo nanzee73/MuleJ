@@ -1,12 +1,15 @@
-# Builds MuleJ for Windows, macOS and Linux.
+# Builds MuleJ for Linux, Windows and macOS.
+#  - Push a tag like v1.0.0 (or create a release with a new tag on GitHub): all packages are built
+#    and attached to that release.
+#  - "Run workflow" on the Actions tab: test build, packages are available as workflow artifacts.
 #
-#   git tag v1.0.0 && git push origin v1.0.0   → builds everything and publishes a GitHub release with the files
-#   Actions tab ▸ "Build installers" ▸ Run workflow → builds everything, files are attached to the run (no release)
-#
-# Files: Windows .msi + portable .zip, macOS .dmg (Apple Silicon), Linux .deb + portable .tar.gz,
-# and for every system with Java 17+: mulej-<version>-all.jar (java -jar) and
-# MuleJ-<version>-all-platforms-java17.zip (start scripts bin/mulej and bin/mulej.bat).
-name: Build installers
+# File names (the same scheme as FlipperJ):
+#   MuleJ-<version>-<platform>.msi / .dmg / .deb      installer with bundled Java
+#   MuleJ-<version>-<platform>-portable.zip / .tar.gz  portable app folder with bundled Java (Windows, Linux)
+#   MuleJ-<version>-all-platforms-java17.zip           start scripts bin/mulej and bin/mulej.bat, needs Java 17+
+#   MuleJ-<version>-all-platforms-java17.jar           single jar (java -jar), needs Java 17+
+# <platform>: linux-x64, windows-x64, macos-arm64 (Apple Silicon), macos-x64 (Intel)
+name: Build & Release
 
 on:
   push:
@@ -18,17 +21,23 @@ permissions:
 
 jobs:
   build:
+    name: ${{ matrix.label }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            types: deb app-image
+            label: linux-x64
           - os: windows-latest
-            types: msi app-image
+            label: windows-x64
           - os: macos-latest
-            types: dmg
+            label: macos-arm64      # Apple Silicon
+          - os: macos-15-intel
+            label: macos-x64        # Intel Macs
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -40,19 +49,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Version from tag
-        shell: bash
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "APP_VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
-          else
-            echo "APP_VERSION=$(grep '^version' build.gradle.kts | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1)" >> "$GITHUB_ENV"
-          fi
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then V="${GITHUB_REF_NAME#v}"
+          else V="$(grep '^version' build.gradle.kts | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1)"; fi
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Building version $V"
 
       - name: Tools for .deb (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y fakeroot
 
-      - name: WiX toolset for .msi (Windows)
+      - name: WiX Toolset (needed for the Windows installer)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -63,58 +70,55 @@ jobs:
           }
 
       - name: Tests
-        shell: bash
-        run: ./gradlew test
-
-      - name: Installers
-        shell: bash
         run: |
-          set -o pipefail
-          for t in ${{ matrix.types }}; do
-            if ! ./gradlew jpackage -PinstallerType=$t -PappVersion="$APP_VERSION" 2>&1 | tee jpackage.log; then
-              # make the reason visible as annotations
-              grep -E "What went wrong|rror|Exception|skipped|Advice|> " jpackage.log | head -40 | while IFS= read -r l; do echo "::error::$t: $l"; done
-              exit 1
-            fi
-          done
+          chmod +x gradlew
+          ./gradlew --no-daemon -PappVersion=$APP_VERSION test
 
-      - name: Pack portable versions
-        shell: bash
-        run: |
-          cd build/installer
-          if [ -d MuleJ ]; then
-            if [ "$RUNNER_OS" = "Windows" ]; then
-              7z a "MuleJ-$APP_VERSION-windows-portable.zip" MuleJ > /dev/null
-            else
-              tar czf "MuleJ-$APP_VERSION-linux-portable.tar.gz" MuleJ
-            fi
-            rm -rf MuleJ
-          fi
-          for f in *.dmg; do [ -e "$f" ] && mv "$f" "MuleJ-$APP_VERSION-macos-arm64.dmg"; done
-          ls -la
-
-      - name: Runnable jar and zip with start scripts (Linux job only, both need Java 17+)
+      - name: Jar and zip with start scripts (need installed Java 17+)
         if: runner.os == 'Linux'
         run: |
-          ./gradlew shadowJar distZip -PappVersion="$APP_VERSION"
-          cp build/libs/mulej-*-all.jar build/installer/
-          cp "build/distributions/mulej-$APP_VERSION.zip" "build/installer/MuleJ-$APP_VERSION-all-platforms-java17.zip"
+          ./gradlew --no-daemon -PappVersion=$APP_VERSION shadowJar distZip
+          mkdir -p dist
+          cp "build/libs/mulej-$APP_VERSION-all.jar" "dist/MuleJ-$APP_VERSION-all-platforms-java17.jar"
+          cp "build/distributions/mulej-$APP_VERSION.zip" "dist/MuleJ-$APP_VERSION-all-platforms-java17.zip"
+
+      - name: Installer with bundled Java
+        run: |
+          set -o pipefail
+          if ! ./gradlew --no-daemon -PappVersion=$APP_VERSION jpackage 2>&1 | tee jpackage.log; then
+            # make the reason visible as annotations
+            grep -E "What went wrong|rror|Exception|skipped|Advice|> " jpackage.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          fi
+          mkdir -p dist
+          for f in build/installer/*.dmg build/installer/*.msi build/installer/*.deb; do
+            [ -e "$f" ] || continue
+            ext="${f##*.}"
+            mv "$f" "dist/MuleJ-$APP_VERSION-${{ matrix.label }}.$ext"
+          done
+
+      - name: Portable app folder with bundled Java (Linux, Windows)
+        if: runner.os != 'macOS'
+        run: |
+          ./gradlew --no-daemon -PappVersion=$APP_VERSION -PinstallerType=app-image jpackage
+          cd build/installer
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            7z a -tzip "../../dist/MuleJ-$APP_VERSION-${{ matrix.label }}-portable.zip" MuleJ > /dev/null
+          else
+            tar czf "../../dist/MuleJ-$APP_VERSION-${{ matrix.label }}-portable.tar.gz" MuleJ
+          fi
+
+      - name: List packages
+        run: ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mulej-${{ runner.os }}
-          path: build/installer/*
+          name: MuleJ-${{ env.APP_VERSION }}-${{ matrix.label }}
+          path: dist/*
 
-  release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - name: Attach to release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true

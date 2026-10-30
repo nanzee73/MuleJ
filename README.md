@@ -135,13 +135,14 @@ Download from the GitHub **Releases** page:
 
 | System | File | Start |
 |---|---|---|
-| Windows | `MuleJ-x.y.z.msi` | Install, then *Start menu ▸ MuleJ*. Command line: `"C:\Program Files\MuleJ\mulej-cli.exe" --help` |
-| Windows (no installation) | `MuleJ-…-windows-portable.zip` | Unpack, run `MuleJ\MuleJ.exe` |
-| macOS (Apple Silicon) | `MuleJ-…-macos-arm64.dmg` | Drag MuleJ into *Applications*. The app is not signed: the first time right click ▸ *Open*. Command line: `/Applications/MuleJ.app/Contents/MacOS/mulej-cli` |
-| Linux (Debian/Ubuntu) | `mulej_x.y.z-1_amd64.deb` | `sudo apt install ./mulej_….deb`, then the menu entry *MuleJ* or `/opt/mulej/bin/MuleJ`; command line `/opt/mulej/bin/mulej-cli` |
-| Linux (others, no installation) | `MuleJ-…-linux-portable.tar.gz` | Unpack, run `MuleJ/bin/MuleJ` |
+| Windows | `MuleJ-x.y.z-windows-x64.msi` | Install, then *Start menu ▸ MuleJ*. Command line: `"C:\Program Files\MuleJ\mulej-cli.exe" --help` |
+| Windows (no installation) | `MuleJ-x.y.z-windows-x64-portable.zip` | Unpack, run `MuleJ\MuleJ.exe` |
+| macOS (Apple Silicon) | `MuleJ-x.y.z-macos-arm64.dmg` | Drag MuleJ into *Applications*. The app is not signed: the first time right click ▸ *Open*. Command line: `/Applications/MuleJ.app/Contents/MacOS/mulej-cli` |
+| macOS (Intel) | `MuleJ-x.y.z-macos-x64.dmg` | as above |
+| Linux (Debian/Ubuntu) | `MuleJ-x.y.z-linux-x64.deb` | `sudo apt install ./MuleJ-x.y.z-linux-x64.deb`, then the menu entry *MuleJ* or `/opt/mulej/bin/MuleJ`; command line `/opt/mulej/bin/mulej-cli` |
+| Linux (others, no installation) | `MuleJ-x.y.z-linux-x64-portable.tar.gz` | Unpack, run `MuleJ/bin/MuleJ` |
 | Any system with Java 17+ | `MuleJ-x.y.z-all-platforms-java17.zip` | Unpack, run `bin/mulej` (Linux, macOS) or `bin\mulej.bat` (Windows); with arguments it runs the command line |
-| Any system with Java 17+ | `mulej-x.y.z-all.jar` | `java -jar mulej-x.y.z-all.jar` (GUI) or `java -jar mulej-x.y.z-all.jar koala bild.png` |
+| Any system with Java 17+ | `MuleJ-x.y.z-all-platforms-java17.jar` | `java -jar MuleJ-x.y.z-all-platforms-java17.jar` (GUI) or `… koala bild.png` (command line) |
 
 The installers and portable versions contain their own Java runtime – nothing else needs to be installed.
 
