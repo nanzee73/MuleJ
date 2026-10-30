@@ -79,6 +79,27 @@ public final class ImageFitter {
 
     private ImageFitter() {}
 
+    /** 320×200, 160×200 or a whole-number multiple/fraction of them: can be taken without choosing a frame. */
+    public static boolean canTakeExactly(BufferedImage img) {
+        return isNativeSize(img) || Settings.isWholeNumberScale(img.getWidth(), img.getHeight());
+    }
+
+    /**
+     * The picture at 320×200 without filtering: 160×200 gets double-wide pixels, whole-number multiples are
+     * reduced to one pixel per block, fractions are enlarged with nearest neighbour.
+     */
+    public static BufferedImage takeExactly(BufferedImage src) {
+        int w = src.getWidth(), h = src.getHeight();
+        BufferedImage out = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
+        int[] row = new int[W];
+        for (int y = 0; y < H; y++) {
+            int sy = (int) ((y + 0.5) * h / H);
+            for (int x = 0; x < W; x++) row[x] = src.getRGB((int) ((x + 0.5) * w / W), sy);
+            out.setRGB(0, y, W, 1, row, 0, W);
+        }
+        return out;
+    }
+
     /** True for 320×200 (hires) or 160×200 (multicolor) images. */
     public static boolean isNativeSize(BufferedImage img) {
         return (img.getWidth() == 320 || img.getWidth() == 160) && img.getHeight() == 200;

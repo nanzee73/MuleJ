@@ -30,9 +30,9 @@ class I18nTest {
             p.remove("language");
             I18n.init();
             assertEquals(java.util.Locale.ENGLISH, I18n.locale());
-            assertEquals("Save", I18n.tr("bottom.run"));
+            assertEquals("Next ▶", I18n.tr("nav.next"));
             I18n.setLocale(java.util.Locale.GERMAN);
-            assertEquals("Speichern", I18n.tr("bottom.run"));
+            assertEquals("Weiter ▶", I18n.tr("nav.next"));
         } finally {
             if (old != null) p.put("language", old); else p.remove("language");
             I18n.init();
@@ -71,16 +71,18 @@ class I18nTest {
     void generatedKeysExist() throws Exception {
         Set<String> en = keys("messages.properties");
         Set<String> need = new TreeSet<>();
-        for (String t : new String[]{"PALETTIZE", "PIXELIZE", "BITMAP"}) {
-            need.add("tool." + t); need.add("tool." + t + ".tip"); need.add("view.result." + t);
-        }
+        for (var t : de.mulej.core.Pipeline.Target.values()) { need.add("target." + t.name()); need.add("target." + t.name() + ".tip"); }
+        for (var st : de.mulej.core.Pipeline.Step.values()) { need.add("step." + st.name()); need.add("step." + st.name() + ".tip"); }
+        for (var c : de.mulej.core.Charset.values()) need.add("charset." + c.name());
         for (var s : de.mulej.color.ColorMatcher.Space.values()) need.add("space." + s.name());
-        for (var d : de.mulej.core.Pixelizer.Direction.values()) { need.add("pixel." + d.name()); need.add("pixel." + d.name() + ".tip"); }
+        for (var d : de.mulej.core.Pixelizer.Direction.values()) need.add("pixel." + d.name());
+        need.add("pixel.L2R.tip");
+        need.add("pixel.R2L.tip");
         for (var m : de.mulej.image.ImageFitter.ScaleMode.values()) need.add("scale." + m.name());
         for (var f : de.mulej.image.ImageFitter.Filter.values()) need.add("scalefilter." + f.name());
         for (var a : de.mulej.image.ImageFitter.Aspect.values()) need.add("aspect." + a.name());
         for (int i = 0; i < 16; i++) need.add("color." + i);
-        for (var m : de.mulej.core.C64Mode.values()) { need.add("mode." + m.name()); need.add("mode." + m.name() + ".tip"); }
+        for (var m : de.mulej.core.C64Mode.values()) need.add("mode." + m.name());
         for (var d : de.mulej.core.Dither.values()) need.add("dither." + d.name());
         need.removeAll(en);
         assertEquals(Set.of(), need);

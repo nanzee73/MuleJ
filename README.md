@@ -1,69 +1,96 @@
 # MuleJ
 
-C64 graphics tools under one roof – the former command line tools **c64palettizer**, **c64pixelizer** and
-**c64koalaverter** (plus its predecessor c64imager) with a Swing GUI in the style of FlipperJ, extended by hires bitmaps,
-dithering and a colour check with automatic and manual correction. The command line keeps working, and with the
-default settings it produces the same results as the old tools.
+Turns any picture into C64 graphics – **multicolor** (Koala Painter), **hires** (Art Studio) or **PETSCII** (Petmate) –
+each also as runnable PRG. Successor of the command line tools **c64palettizer**, **c64pixelizer** and
+**c64koalaverter** (plus c64imager), with a Swing GUI in the style of FlipperJ. The command line keeps working, and with
+the default settings it produces the same results as the old tools.
 
-## Tools
+## The chain
 
-| Tool | What it does | Output |
-|---|---|---|
-| **Palettize** | Replaces every colour by the nearest colour of a C64 palette, optionally dithered. Any picture size, or brought to 320×200. | `NAME_palettized.png` |
-| **Pixelize 2×1** | Makes every two neighbouring pixels equal (multicolor pixels): left→right or right→left. | `NAME_pixelized_l2r.png` or `NAME_pixelized_r2l.png` |
-| **C64 bitmap – multicolor** | 160×200, per 4×8 cell 3 colours plus one background colour for the whole picture. | `NAME.kla` (Koala Painter, 10003 bytes, `$6000`) |
-| **C64 bitmap – hires** | 320×200, per 8×8 cell 2 colours. | `NAME.art` (OCP Art Studio, 9009 bytes, `$2000`) |
+Choose the **target** first, then open a picture (or drop it onto the window). Every picture runs through the same steps;
+each step has only its own settings, shows its input (left) and output (right), and its output can be saved as PNG.
 
-### Bringing pictures to 320×200
+| Step | Multicolor | Hires | PETSCII | What happens |
+|---|---|---|---|---|
+| ① Original | ✔ | ✔ | ✔ | the loaded picture next to the final result |
+| ② Frame | ✔ | ✔ | ✔ | bring the picture to 320×200 (see below) |
+| ③ Prepare | ✔ | ✔ | ✔ | contrast, brightness, gamma, saturation – as in FlipperJ |
+| ④ Pixelizer | ✔ | – | – | two neighbouring pixels become one double-wide multicolor pixel (left→right or right→left) |
+| ⑤ Colours | ✔ | ✔ | ✔ | palette, colour matching, dithering; for PETSCII the characters |
+| ⑥ Result | ✔ | ✔ | ✔ | colour check, correction, saving as `.kla` / `.art` / `.petmate` and as PRG |
 
-*Bring to 320×200* (always on for C64 bitmaps) opens the crop & scale dialog for every picture that is not 320×200 or 160×200.
-The dialog always starts with the **largest centered frame in the C64 aspect ratio** (PAL, ≈1.50:1, as on a real monitor):
+Every change is computed automatically from the changed step on. *Back* / *Next* or a click on a step moves between them.
+Until a picture is opened, everything except the target, *Open picture* and the menus is locked.
+
+### Starting later: edit intermediate results elsewhere
+
+*This step as PNG…* saves the output of the shown step in the folder of the source picture – optionally enlarged
+2×, 3× or 4× for comfortable editing on the PC or phone. When such a picture is loaded again, MuleJ finds out how far it
+already is (**Start at: automatic**) and passes the earlier steps through unchanged:
+
+* not 320×200 / 160×200 (or a whole-number multiple, e.g. a 2× export) → ② frame
+* C64 size, free colours → ③ prepare
+* only colours of a C64 palette (small deviations from JPEG or phone apps are tolerated; the palette is recognised too)
+  → multicolor with unequal pixel pairs: ④ pixelizer, PETSCII: ⑤ characters, otherwise ⑥ colour check
+  (colours are then only snapped to the palette – no dithering, no automatic correction)
+
+The start can also be chosen by hand (*Start at*), and every skipped step offers *Use this step*. Koala and Art Studio files
+can be opened as well.
+
+### ② Frame
+
+The step starts with the **largest centered frame in the C64 aspect ratio** (PAL, ≈1.50:1, as on a real monitor):
 
 * **Larger pictures** are scaled down into that frame; drag it, resize it at the corner or draw a new one.
-* **320×200 frame (1:1)** – a frame of exactly 320×200 picture pixels without any scaling; it can only be moved
-  (a click puts it where you clicked). Pictures smaller than 320×200 get the border colour around them.
-* **Smaller pictures** are scaled up along their shorter side, so the C64 frame is filled completely (no border).
-  Pictures that fit 320×200 or 160×200 by a whole-number factor (e.g. 160×100, 80×100, 640×400)
-  are taken completely and scaled exactly with nearest neighbour, so pixel art stays crisp.
-* **Mouse wheel** zooms into the picture (around the mouse pointer), right or middle drag pans, double click shows the whole picture.
-* Scaling modes stretch / fit (letterbox) / fill (crop), aspect PAL / square pixels / NTSC / free, four filters, border colour.
-* A right click into the original preview chooses the frame directly in the preview (the 1:1 frame keeps its size).
+* **Smaller pictures** are scaled up along their shorter side, so the frame is filled completely (no border).
+  Pictures that fit 320×200 or 160×200 by a whole-number factor (e.g. 160×100, 640×400) are taken completely and
+  scaled exactly with nearest neighbour, so pixel art stays crisp.
+* **320×200 frame (1:1)** – exactly 320×200 picture pixels without scaling; it can only be moved. Pictures smaller than
+  320×200 get the border colour around them.
+* Mouse wheel zooms around the pointer, right or middle drag pans, double click shows the whole picture.
+* Scaling stretch / fit (letterbox) / fill (crop), aspect PAL / square pixels / NTSC / free, four filters, border colour.
 
-### Dithering
+### ⑤ Colours – multicolor and hires
 
-None, Floyd-Steinberg, Atkinson, Jarvis-Judice-Ninke, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8 (same methods as FlipperJ),
-with strength, serpentine scanning and – for C64 bitmaps – *bleeding* (off = the error never leaves its cell).
-For C64 bitmaps every cell first gets the colours that reproduce it best, then the picture is dithered with exactly
-those colours, so the result always keeps the colour rules.
+Palettes Colodore (default, as before), Pepto, DeeKay, PALette, Community Colors, Ptoing, C64HQ, CCS64, C64S, VICE, or
+custom ones (colour editor, `.vpl`/`.gpl`/hex files); matching in plain euclidean RGB (default, as before), weighted RGB,
+YUV or HSL. Dithering: Floyd-Steinberg, Atkinson, Jarvis-Judice-Ninke, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8 with
+strength, serpentine and bleeding. With dithering every cell first gets the colours that reproduce it best, then the
+picture is dithered with exactly those colours – the result always keeps the colour rules. Without dithering,
+*Correct automatically* fixes cells with too many colours.
 
-### Colour check & correction (C64 bitmaps)
+### ⑤ Colours – PETSCII
 
-Every result is checked against the rules of the mode. Only a picture that passes is written as `.kla` / `.art`.
+The text screen has 40×25 cells; every cell shows one character of the C64 character set in one colour on a background
+colour shared by the whole screen (`$D021`). MuleJ finds the combination that looks most like the original:
 
-* **Check**: “✔ all 1000 cells keep the rules” or “✘ 37 cells break the multicolor rules”; offending cells are marked red,
-  ◀ ▶ jumps to the previous/next conflict and zooms in.
-* **Automatic**: *Correct automatically* gives every offending cell the colours (out of all combinations) that reproduce
-  it best; dithering always produces valid pictures.
-* **Manual**, by clicking into the result:
-  * *Select cell* shows the colours of the cell with their pixel counts. Press the colours the cell may use and
-    *Apply colours* – every pixel gets the nearest of them. *Automatic* does the same with the best colours for this cell.
-  * *Paint* sets single pixels to a chosen colour (left click / drag).
-  * *Reset cell* / *Discard all corrections* undo the manual changes. Corrected cells are marked yellow, the selected cell cyan.
-* *Palettize first* off: the picture must already consist of palette colours – useful to only check and fix finished pixel art.
-  Koala and Art Studio files can be opened too.
+* For every cell **all characters × all 15 foreground colours** are rated, for **all 16 background colours**
+  (the background with the smallest total error wins, or a fixed one).
+* Each candidate is rated twice and the two are mixed (*Detail*): **pixel by pixel** – characters follow edges and lines –
+  and **blurred** (binomial filter), which rates brightness and colour the way the eye sees a cell from a distance, so
+  checkerboards and half blocks stand in for in-between tones.
+* Colours are compared in a linear colour space, so the error of a character can be written as `|A|² − 2·D·S + |D|²·Q`
+  (`D` = foreground − background): per cell only a few numbers per character are needed, and the roughly 60 million
+  combinations take well under a second.
+* The remaining average error of a cell is passed on to its neighbours (*Diffusion*, Floyd-Steinberg on cell level), so
+  areas and gradients keep their tone. *Calm* keeps busy characters away unless they clearly help, and by default only
+  graphics characters are used (letters and digits can be switched on).
+* Upper case + graphics or lower + upper case character set.
 
-### More
+The character set data is the C64 character ROM as shipped with Petmate, so MuleJ and Petmate show the same glyphs.
 
-* Every picture format Java ImageIO reads plus the TwelveMonkeys plugins (WebP, TIFF, PSD, TGA, …) – the old tools only took PNG.
-* Palettes Colodore (default, as before), Pepto, DeeKay, PALette, Community Colors, Ptoing, C64HQ, CCS64, C64S, VICE;
-  custom palettes via the colour editor or `.vpl`/`.gpl`/hex files.
-* Colour matching in plain euclidean RGB (default, as before), luma-weighted RGB, YUV or HSL.
-* Previews: zoom with the mouse wheel, pan with the right mouse button, linked previews, pixel and 8×8 cell grid.
-* **Result as PNG…** saves the right preview, **Result as PRG…** a runnable C64 program that shows the picture
-  (C64 bitmap tool, once the colour check has passed: `LOAD"NAME",8` and `RUN`, any key returns to BASIC).
-  Both start in the folder of the source picture.
-* Until a picture is opened, everything except opening a picture, the tool choice and the menus is locked.
-* English and German user interface (*Language* menu, English by default, no restart needed).
+### ⑥ Result
+
+* **Colour check** (multicolor/hires): “✔ all 1000 cells keep the rules” or “✘ 37 cells break the multicolor rules”;
+  offending cells are marked red, ◀ ▶ jumps to the previous/next conflict and zooms in.
+* **Manual correction** by clicking into the result: *Select cell* shows its colours with pixel counts – press the
+  colours the cell may use and *Apply colours*, or *Automatic* for the best colours of this cell; *Paint* sets single
+  pixels; *Reset cell* / *Discard all* undo. Corrected cells are marked yellow, the selected cell cyan.
+* PETSCII always keeps its rules (one character colour plus background per cell); to edit further, save as Petmate file.
+* **Save Koala / Art Studio / Petmate…** and **Save PRG…** (only once the colour check has passed) start in the folder of
+  the source picture. The PRG shows the picture after `LOAD"NAME",8` and `RUN`; any key returns to BASIC.
+
+English and German user interface (*Language* menu, English by default, no restart needed).
 
 ## Command line
 
@@ -76,13 +103,16 @@ mulej pixelize image.png                        # -> image_pixelized_l2r.png + i
 mulej koala image.png                           # -> image.kla
 mulej koala photo.jpg --fit fill --space yuv --dither fs --preview check.png --prg photo.prg
 mulej hires image.png --fix-clashes             # -> image.art
+mulej petscii photo.jpg --fit fill --contrast 20 --prg photo.prg   # -> photo.petmate + photo.prg
 mulej check pixelart.png --mode hires --no-palettize   # list every cell that breaks the rules
-mulej topng image.kla                           # -> image.png
+mulej topng image.kla                           # -> image.png (also .art and .petmate)
 mulej palettize -if image.png                   # the old -if syntax still works
 mulej --help
 ```
 
 Exit codes as before: 0 = OK, 1 = wrong parameters, 2 = conversion error (`check`: 2 = rules broken).
+`--contrast`, `--brightness`, `--gamma`, `--saturation` prepare the picture; PETSCII: `--charset upper|lower`, `--text`,
+`--detail`, `--diffusion`, `--calm`, `--bg`. `mulej --help` lists everything.
 The command line still offers `avg` (average of a pixel pair) for `--dir` and `--pair`; the GUI only offers left→right and right→left.
 
 ### PRG memory map
@@ -90,13 +120,13 @@ The command line still offers `avg` (average of a pixel pair) for `--dir` and `-
 | Address | Content |
 |---|---|
 | `$0801` | BASIC line `10 SYS2061` |
-| `$080D` | viewer code (sets VIC bank 0, bitmap mode, copies colour RAM, waits for a key, restores the text screen) |
-| `$0C00–$0FE7` | screen RAM (the VIC reads it there directly) |
-| `$1000–$13E7` | colour RAM data (multicolor), copied to `$D800` |
+| `$080D` | viewer code (sets VIC bank 0 and the mode, copies colour RAM, waits for a key, restores the text screen) |
+| `$0C00–$0FE7` | screen RAM (bitmaps: the VIC reads it there directly; PETSCII: screen codes, copied to `$0400`) |
+| `$1000–$13E7` | colour RAM data (multicolor, PETSCII), copied to `$D800` |
 | `$13E8` / `$13E9` | background / border colour |
 | `$2000–$3F3F` | bitmap |
 
-The viewer was checked in a 6502 simulator (the picture the VIC would show is identical to the `.kla`/`.art` data),
+The viewer was checked in a 6502 simulator (what the VIC would show is identical to the `.kla`/`.art`/`.petmate` data),
 not yet in VICE or on real hardware.
 
 ## Using MuleJ (for users)
@@ -147,23 +177,29 @@ the old tools and MuleJ were compared on all pictures in their `ressources` fold
 **OCP Art Studio** (`.art`): `$2000` load address, 8000 bytes bitmap, 1000 bytes screen RAM (high nibble = set bits,
 low nibble = cleared bits), 7 bytes filler (the first is used as border colour by some programs) – 9009 bytes.
 
+**Petmate** (`.petmate`): Petmate workspace, version 2, one 40×25 screen with `code` (screen code) and `color` per cell,
+`backgroundColor`, `borderColor` and `charset` (`upper` / `lower`).
+
 ## License
 
 MIT License (see `LICENSE`): you may use, copy, change, sell and pass on MuleJ in any way, as long as the copyright
 notice and the license text stay with every copy and every program based on it – that names the original.
 The old tools c64palettizer, c64pixelizer, c64koalaverter and c64helpers are under the same license.
+`src/main/resources/de/mulej/charset/` holds the C64 character set data (C64 character ROM, © Commodore) as shipped with
+Petmate (MIT License, © C. T. Lin).
 
 ## Project layout
 
 ```
 src/main/java/de/mulej/
   App.java, Cli.java          entry point, command line
-  core/                       Palettizer, Pixelizer, Ditherer, BitmapConverter (check & correction),
-                              KoalaImage, HiresImage, C64Mode, Images
+  core/                       Pipeline (the chain, automatic start), Palettizer, Pixelizer, Ditherer,
+                              BitmapConverter (check & correction), PetsciiConverter, KoalaImage, HiresImage,
+                              PetsciiImage (Petmate), Charset, ViewerPrg (6502 viewer), Images
   palette/                    palettes, .vpl/.gpl/hex loading
   color/ColorMatcher.java     colour distance in euclidean RGB / weighted RGB / YUV / HSL
-  image/ImageFitter.java      crop & scale to 320×200, 1:1 frame
-  gui/                        Swing UI (previews, crop dialog, palette editor – shared with FlipperJ)
+  image/                      ImageFitter (crop & scale to 320×200, 1:1 frame), ImageAdjust (prepare)
+  gui/                        Swing UI: MainWindow (target, steps, previews), CropEditor, palette editor
   i18n/                       English/German texts
 src/test/java/...             JUnit 5 tests
 packaging/                    icon (grey mule, C64 light grey on C64 blue, like the FlipperJ dolphin) as SVG, PNG and .ico;

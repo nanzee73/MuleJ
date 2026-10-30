@@ -1,130 +1,127 @@
 package de.mulej.gui;
 
+import de.mulej.i18n.I18n;
 import de.mulej.image.ImageFitter;
 
 import javax.swing.*;
-
-import static de.mulej.i18n.I18n.tr;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 
+import static de.mulej.i18n.I18n.tr;
+
 /**
- * Crop and scale tool for pictures that are not 320×200.
- * Drag inside the frame to move it, drag the bottom-right handle to resize, drag outside to draw a new frame.
+ * Frame & scaling to 320×200 (step "frame"): an interactive view of the source picture with the frame
+ * ({@link #view()}) and the settings ({@link #controls()}), placed separately in the main window.
+ * <p>
+ * View: mouse wheel zooms, right/middle drag pans, double click shows the whole picture; drag inside the frame
+ * to move it, the corner resizes it, dragging outside draws a new frame (1:1 frame: a click moves it there).
  */
-public class CropScaleDialog extends JDialog {
-    private final BufferedImage source;
-    private Rectangle crop;
-    private boolean accepted;
+public class CropEditor {
+    private BufferedImage source;
+    private Rectangle crop = new Rectangle(0, 0, 1, 1);
+    private Runnable onChange = () -> {};
 
     private final JComboBox<ImageFitter.Aspect> aspectBox = new JComboBox<>(ImageFitter.Aspect.values());
     private final JComboBox<ImageFitter.ScaleMode> modeBox = new JComboBox<>(ImageFitter.ScaleMode.values());
     private final JComboBox<ImageFitter.Filter> filterBox = new JComboBox<>(ImageFitter.Filter.values());
-    private final JCheckBox lockAspect = new JCheckBox(tr("crop.lock"), true);
+    private final JCheckBox lockAspect = I18n.text(new JCheckBox("", true), "crop.lock");
     private final JSpinner sx = new JSpinner(), sy = new JSpinner(), sw = new JSpinner(), sh = new JSpinner();
-    private final JButton fillButton = new JButton(tr("crop.border"));
-    private Color fill;
-    private final ImagePanel preview = new ImagePanel();
+    private final JButton fillButton = I18n.text(new JButton(), "crop.border");
+    private Color fill = Color.BLACK;
     private final CropView view = new CropView();
+    private final JPanel controls = new JPanel(new GridBagLayout());
     private boolean updating;
+    private ImageFitter.ScaleMode lastMode;
 
-    public CropScaleDialog(Frame owner, BufferedImage source, ImageFitter.Settings initial) {
-        super(owner, tr("crop.title", source.getWidth(), source.getHeight()), true);
-        this.source = source;
-        this.crop = initial.crop() != null ? new Rectangle(initial.crop())
-                : new Rectangle(0, 0, source.getWidth(), source.getHeight());
-        this.fill = initial.fill();
-        this.lastMode = initial.mode();
-        aspectBox.setSelectedItem(initial.aspect());
-        modeBox.setSelectedItem(initial.mode());
-        filterBox.setSelectedItem(initial.filter());
-
-        setLayout(new BorderLayout(8, 8));
-        view.setPreferredSize(new Dimension(640, 480));
-        view.setToolTipText(tr("crop.help"));
-        add(view, BorderLayout.CENTER);
-
-        JPanel side = new JPanel(new GridBagLayout());
+    public CropEditor() {
+        I18n.tip(view, "crop.help");
+        view.setBackground(new Color(0x30, 0x30, 0x30));
         GridBagConstraints c = new GridBagConstraints();
         c.gridx = 0; c.gridy = 0; c.anchor = GridBagConstraints.WEST; c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(2, 4, 2, 4); c.gridwidth = 2;
-        side.add(new JLabel(tr("crop.aspect")), c); c.gridy++;
-        side.add(aspectBox, c); c.gridy++;
-        side.add(new JLabel(tr("crop.mode")), c); c.gridy++;
-        side.add(modeBox, c); c.gridy++;
-        side.add(new JLabel(tr("crop.filter")), c); c.gridy++;
-        side.add(filterBox, c); c.gridy++;
-        side.add(fillButton, c); c.gridy++;
-        side.add(lockAspect, c); c.gridy++;
+        c.insets = new Insets(2, 3, 2, 3); c.gridwidth = 2; c.weightx = 1;
+        controls.add(I18n.label("crop.aspect"), c); c.gridy++;
+        controls.add(aspectBox, c); c.gridy++;
+        controls.add(I18n.label("crop.mode"), c); c.gridy++;
+        controls.add(modeBox, c); c.gridy++;
+        controls.add(I18n.label("crop.filter"), c); c.gridy++;
+        controls.add(filterBox, c); c.gridy++;
+        controls.add(fillButton, c); c.gridy++;
+        controls.add(lockAspect, c); c.gridy++;
         c.gridwidth = 1;
-        addSpinner(side, c, tr("crop.x"), sx); addSpinner(side, c, tr("crop.y"), sy);
-        addSpinner(side, c, tr("crop.width"), sw); addSpinner(side, c, tr("crop.height"), sh);
+        addSpinner(c, "crop.x", sx); addSpinner(c, "crop.y", sy);
+        addSpinner(c, "crop.width", sw); addSpinner(c, "crop.height", sh);
         c.gridx = 0; c.gridwidth = 2;
-        JButton whole = new JButton(tr("crop.whole"));
-        JButton center = new JButton(tr("crop.center"));
-        JButton oneToOne = new JButton(tr("crop.oneToOne"));
-        oneToOne.setToolTipText(tr("crop.oneToOne.tip"));
-        side.add(whole, c); c.gridy++;
-        side.add(center, c); c.gridy++;
-        side.add(oneToOne, c); c.gridy++;
-        side.add(new JLabel(tr("crop.preview")), c); c.gridy++;
-        preview.setPreferredSize(new Dimension(320, 200));
-        side.add(preview, c); c.gridy++;
-        c.weighty = 1; side.add(Box.createVerticalGlue(), c);
-        add(side, BorderLayout.EAST);
+        JButton whole = I18n.text(new JButton(), "crop.whole");
+        JButton center = I18n.text(new JButton(), "crop.center");
+        JButton oneToOne = I18n.tip(I18n.text(new JButton(), "crop.oneToOne"), "crop.oneToOne.tip");
+        controls.add(whole, c); c.gridy++;
+        controls.add(center, c); c.gridy++;
+        controls.add(oneToOne, c); c.gridy++;
+        JLabel help = new JLabel();
+        I18n.bind(() -> help.setText(MainWindow.wrapped("<small>" + tr("crop.help") + "</small>")));
+        controls.add(help, c); c.gridy++;
 
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton ok = new JButton(tr("ok")), cancel = new JButton(tr("cancel"));
-        buttons.add(ok); buttons.add(cancel);
-        add(buttons, BorderLayout.SOUTH);
-
-        ok.addActionListener(e -> { accepted = true; dispose(); });
-        cancel.addActionListener(e -> dispose());
         whole.addActionListener(e -> {
+            if (source == null) return;
             if (fixed()) modeBox.setSelectedItem(ImageFitter.ScaleMode.FIT);
             crop = new Rectangle(0, 0, source.getWidth(), source.getHeight());
             refresh();
         });
         center.addActionListener(e -> {
+            if (source == null) return;
             if (fixed()) modeBox.setSelectedItem(ImageFitter.ScaleMode.FILL);
             crop = maxCentered();
             refresh();
         });
         oneToOne.addActionListener(e -> modeBox.setSelectedItem(ImageFitter.ScaleMode.NONE));
         fillButton.addActionListener(e -> {
-            Color chosen = JColorChooser.showDialog(this, tr("crop.border").replace("…", ""), fill);
+            Color chosen = JColorChooser.showDialog(view, tr("crop.border").replace("…", ""), fill);
             if (chosen != null) { fill = chosen; refresh(); }
         });
-        aspectBox.addActionListener(e -> refresh());
-        modeBox.addActionListener(e -> modeChanged());
-        filterBox.addActionListener(e -> refresh());
+        aspectBox.addActionListener(e -> { if (!updating) refresh(); });
+        modeBox.addActionListener(e -> { if (!updating) modeChanged(); });
+        filterBox.addActionListener(e -> { if (!updating) refresh(); });
         for (JSpinner s : new JSpinner[]{sx, sy, sw, sh}) s.addChangeListener(e -> fromSpinners());
-
-        getRootPane().setDefaultButton(ok);
-        refresh();
-        pack();
-        setLocationRelativeTo(owner);
     }
 
-    private static void addSpinner(JPanel p, GridBagConstraints c, String label, JSpinner s) {
-        c.gridx = 0; p.add(new JLabel(label), c);
-        c.gridx = 1; p.add(s, c);
+    public JComponent view() { return view; }
+
+    public JPanel controls() { return controls; }
+
+    /** Called whenever the frame or a setting changes. */
+    public void setOnChange(Runnable r) { onChange = r; }
+
+    /** Shows a new picture with the given settings (null crop = whole picture). */
+    public void setSource(BufferedImage img, ImageFitter.Settings s) {
+        source = img;
+        updating = true;
+        crop = s.crop() != null ? new Rectangle(s.crop()) : new Rectangle(0, 0, img.getWidth(), img.getHeight());
+        fill = s.fill();
+        lastMode = s.mode();
+        aspectBox.setSelectedItem(s.aspect());
+        modeBox.setSelectedItem(s.mode());
+        filterBox.setSelectedItem(s.filter());
+        updating = false;
+        view.zoom = 1;
+        refreshControls();
+        view.repaint();
+    }
+
+    private void addSpinner(GridBagConstraints c, String key, JSpinner s) {
+        c.gridx = 0; c.weightx = 0; controls.add(I18n.label(key), c);
+        c.gridx = 1; c.weightx = 1; controls.add(s, c);
         c.gridy++;
     }
-
-    public boolean isAccepted() { return accepted; }
 
     /** 1:1 mode: the frame is exactly 320×200 source pixels and can only be moved. */
     private boolean fixed() { return modeBox.getSelectedItem() == ImageFitter.ScaleMode.NONE; }
 
-    private ImageFitter.ScaleMode lastMode;
-
     private void modeChanged() {
+        if (source == null) return;
         boolean nowFixed = fixed(), wasFixed = lastMode == ImageFitter.ScaleMode.NONE;
         if (nowFixed && !wasFixed) {
-            // keep the centre of the current frame
             crop = clampRect(new Rectangle((int) Math.round(crop.getCenterX()) - ImageFitter.W / 2,
                     (int) Math.round(crop.getCenterY()) - ImageFitter.H / 2, ImageFitter.W, ImageFitter.H));
         } else if (!nowFixed && wasFixed) {
@@ -135,7 +132,8 @@ public class CropScaleDialog extends JDialog {
     }
 
     public ImageFitter.Settings getSettings() {
-        Rectangle r = crop.equals(new Rectangle(0, 0, source.getWidth(), source.getHeight())) ? null : new Rectangle(crop);
+        Rectangle r = source == null || crop.equals(new Rectangle(0, 0, source.getWidth(), source.getHeight()))
+                ? null : new Rectangle(crop);
         return new ImageFitter.Settings(r, (ImageFitter.ScaleMode) modeBox.getSelectedItem(),
                 (ImageFitter.Filter) filterBox.getSelectedItem(), (ImageFitter.Aspect) aspectBox.getSelectedItem(), fill);
     }
@@ -156,7 +154,7 @@ public class CropScaleDialog extends JDialog {
     }
 
     private void fromSpinners() {
-        if (updating) return;
+        if (updating || source == null) return;
         crop = clampRect(new Rectangle((Integer) sx.getValue(), (Integer) sy.getValue(),
                 (Integer) sw.getValue(), (Integer) sh.getValue()));
         refresh();
@@ -178,25 +176,33 @@ public class CropScaleDialog extends JDialog {
     }
 
     private void refresh() {
+        refreshControls();
+        view.repaint();
+        onChange.run();
+    }
+
+    private void refreshControls() {
+        if (source == null) return;
         updating = true;
         boolean f = fixed();
         int minX = f ? Math.min(0, source.getWidth() - ImageFitter.W) : 0;
         int minY = f ? Math.min(0, source.getHeight() - ImageFitter.H) : 0;
         int maxX = f ? Math.max(0, source.getWidth() - ImageFitter.W) : source.getWidth() - 1;
         int maxY = f ? Math.max(0, source.getHeight() - ImageFitter.H) : source.getHeight() - 1;
-        sx.setModel(new SpinnerNumberModel(crop.x, minX, maxX, 1));
-        sy.setModel(new SpinnerNumberModel(crop.y, minY, maxY, 1));
+        sx.setModel(new SpinnerNumberModel(Math.max(minX, Math.min(maxX, crop.x)), minX, maxX, 1));
+        sy.setModel(new SpinnerNumberModel(Math.max(minY, Math.min(maxY, crop.y)), minY, maxY, 1));
         sw.setModel(new SpinnerNumberModel(crop.width, 1, Math.max(crop.width, source.getWidth()), 1));
         sh.setModel(new SpinnerNumberModel(crop.height, 1, Math.max(crop.height, source.getHeight()), 1));
-        sw.setEnabled(!f);
-        sh.setEnabled(!f);
-        aspectBox.setEnabled(!f);
-        filterBox.setEnabled(!f);
-        lockAspect.setEnabled(!f);
+        sw.setEnabled(controls.isEnabled() && !f);
+        sh.setEnabled(controls.isEnabled() && !f);
+        aspectBox.setEnabled(controls.isEnabled() && !f);
+        filterBox.setEnabled(controls.isEnabled() && !f);
+        lockAspect.setEnabled(controls.isEnabled() && !f);
         updating = false;
-        preview.setImage(ImageFitter.fit(source, getSettings()));
-        view.repaint();
     }
+
+    /** After the main window enabled/disabled the controls: keep the 1:1 restrictions. */
+    public void enabledChanged() { refreshControls(); }
 
     /** Source image with an editable crop frame. */
     private class CropView extends JComponent {
@@ -212,6 +218,7 @@ public class CropScaleDialog extends JDialog {
         CropView() {
             MouseAdapter ma = new MouseAdapter() {
                 @Override public void mouseWheelMoved(java.awt.event.MouseWheelEvent e) {
+                    if (source == null) return;
                     zoomAt(zoom * Math.pow(1.25, -e.getPreciseWheelRotation()), e.getPoint());
                 }
 
@@ -223,6 +230,7 @@ public class CropScaleDialog extends JDialog {
                 }
 
                 @Override public void mousePressed(MouseEvent e) {
+                    if (source == null) return;
                     if (!SwingUtilities.isLeftMouseButton(e)) {          // right / middle button: pan the view
                         panLast = e.getPoint();
                         setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
@@ -345,6 +353,12 @@ public class CropScaleDialog extends JDialog {
 
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
+            if (source == null) {
+                g2.setColor(new Color(0x30, 0x30, 0x30));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+                return;
+            }
             g2.setColor(Color.DARK_GRAY);
             g2.fillRect(0, 0, getWidth(), getHeight());
             double s = scale();

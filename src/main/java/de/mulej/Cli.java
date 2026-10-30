@@ -2,6 +2,7 @@ package de.mulej;
 
 import de.mulej.color.ColorMatcher;
 import de.mulej.core.*;
+import de.mulej.image.ImageAdjust;
 import de.mulej.image.ImageFitter;
 import de.mulej.palette.Palette;
 import de.mulej.palette.Palettes;
@@ -32,8 +33,9 @@ public final class Cli {
                                                                                  NAME_pixelized_r2l.png
               koala       multicolor bitmap (bg + 3 colours per 4x8 cell)     -> NAME.kla  (Koala Painter)
               hires       hires bitmap (2 colours per 8x8 cell)               -> NAME.art  (Art Studio)
+              petscii     text screen: characters + colours, for Petmate       -> NAME.petmate
               check       colour check: list the cells that break the rules of --mode (no file written)
-              topng       Koala (.kla) or Art Studio (.art) file to PNG       -> NAME.png
+              topng       Koala (.kla), Art Studio (.art) or Petmate file to PNG -> NAME.png
 
             Input can also be given as -if FILE (like the old c64palettizer/pixelizer/koalaverter).
             Output: second argument or -o FILE (pixelize: only with a single --dir).
@@ -56,8 +58,15 @@ public final class Cli {
               --no-palettize          koala/hires/check: every pixel must already be a palette colour
               --bg auto|0..15         koala: background colour (default: most common colour)
               --fix-clashes           koala/hires: correct cells with too many colours instead of failing
-              --preview FILE.png      koala/hires: also write the result as PNG
-              --prg FILE.prg          koala/hires: also write a runnable C64 program that shows the picture
+              --preview FILE.png      koala/hires/petscii: also write the result as PNG
+              --prg FILE.prg          koala/hires/petscii: also write a runnable C64 program that shows it
+              --contrast N --brightness N   prepare: -100..100 (default 0)
+              --gamma N --saturation N      prepare: percent (default 100)
+              --charset upper|lower   petscii: character set (default: upper = upper case + graphics)
+              --text                  petscii: also use letters, digits and punctuation
+              --detail N              petscii: 0..100, pixel exact shapes vs. soft tones (default 40)
+              --diffusion N           petscii: 0..100, error passed on to neighbour cells (default 40)
+              --calm N                petscii: 0..100, avoid busy characters (default 30)
               -h, --help              this help
             """;
 
@@ -83,6 +92,11 @@ public final class Cli {
         Dither dither = Dither.NONE;
         ImageFitter.ScaleMode fit = null;
         Path in = null, out = null, preview = null, prg = null;
+        int contrastV = 0, brightnessV = 0, gammaV = 100, saturationV = 100;
+        PetsciiConverter.Settings pd = PetsciiConverter.Settings.defaults();
+        Charset charset = pd.charset();
+        boolean text = pd.textChars();
+        int detailV = pd.detail(), diffusionV = pd.diffusion(), calmV = pd.calm();
         try {
             for (int i = 1; i < args.length; i++) {
                 String a = args[i];
@@ -109,6 +123,15 @@ public final class Cli {
                     case "--no-bleeding" -> bleeding = false;
                     case "--preview" -> preview = Path.of(next(args, ++i));
                     case "--prg" -> prg = Path.of(next(args, ++i));
+                    case "--contrast" -> contrastV = Integer.parseInt(next(args, ++i));
+                    case "--brightness" -> brightnessV = Integer.parseInt(next(args, ++i));
+                    case "--gamma" -> gammaV = Integer.parseInt(next(args, ++i));
+                    case "--saturation" -> saturationV = Integer.parseInt(next(args, ++i));
+                    case "--charset" -> charset = Charset.byName(next(args, ++i));
+                    case "--text" -> text = true;
+                    case "--detail" -> detailV = Integer.parseInt(next(args, ++i));
+                    case "--diffusion" -> diffusionV = Integer.parseInt(next(args, ++i));
+                    case "--calm" -> calmV = Integer.parseInt(next(args, ++i));
                     default -> {
                         if (a.startsWith("-")) throw new IllegalArgumentException("Unknown option: " + a);
                         if (in == null) in = Path.of(a);
@@ -118,7 +141,7 @@ public final class Cli {
                 }
             }
             if (in == null) throw new IllegalArgumentException("No input file given.");
-            if (!List.of("palettize", "pixelize", "koala", "hires", "check", "topng").contains(cmd))
+            if (!List.of("palettize", "pixelize", "koala", "hires", "petscii", "check", "topng").contains(cmd))
                 throw new IllegalArgumentException("Unknown command: " + args[0]);
             if (cmd.equals("pixelize") && !List.of("both", "l2r", "r2l", "avg").contains(dir))
                 throw new IllegalArgumentException("--dir must be both, l2r, r2l or avg");
@@ -133,6 +156,7 @@ public final class Cli {
         }
 
         Ditherer.Settings ds = new Ditherer.Settings(dither, strength, serpentine, bleeding);
+        ImageAdjust.Settings adjust = new ImageAdjust.Settings(brightnessV, contrastV, gammaV, saturationV);
         try {
             switch (cmd) {
                 case "palettize" -> {
@@ -155,9 +179,32 @@ public final class Cli {
                     }
                     System.out.println("Pixelizing of " + in + " successful.");
                 }
+                case "petscii" -> {
+                    BufferedImage src = Images.read(in, pal);
+                    if (!(src.getWidth() == 320 && src.getHeight() == 200)) {
+                        if (ImageFitter.canTakeExactly(src)) src = ImageFitter.takeExactly(src);
+                        else if (fit != null) src = fitted(src, fit);
+                        else throw new IllegalStateException("Image resolution must be 320 x 200, not "
+                                + src.getWidth() + " x " + src.getHeight() + " (use --fit).");
+                    }
+                    src = prepared(src, adjust);
+                    PetsciiImage p = PetsciiConverter.convert(src, pal, space,
+                            new PetsciiConverter.Settings(charset, text, bg, detailV, diffusionV, calmV));
+                    Path target = out != null ? out : Images.sibling(in, ".petmate");
+                    String name = in.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+                    Files.writeString(target, p.toPetmate(name), java.nio.charset.StandardCharsets.UTF_8);
+                    if (preview != null) Images.writePng(p.render(pal), preview);
+                    if (prg != null) {
+                        Files.write(prg, ViewerPrg.petscii(p));
+                        System.out.println("Wrote " + prg + " (LOAD\"NAME\",8 and RUN on the C64)");
+                    }
+                    System.out.println("Conversion of " + in + " successful: " + target + " (background "
+                            + p.background + ", " + p.distinctCodes() + " different characters)");
+                }
                 case "koala", "hires", "check" -> {
                     BufferedImage src = Images.read(in, pal);
                     if (!BitmapConverter.isValidSize(src) && fit != null) src = fitted(src, fit);
+                    if (BitmapConverter.isValidSize(src)) src = prepared(src, adjust);
                     BitmapConverter.Result r = BitmapConverter.convert(src, new BitmapConverter.Settings(
                             mode, pal, space, pair, palettize, bg, fix && !cmd.equals("check"), ds));
                     if (cmd.equals("check")) {
@@ -192,9 +239,15 @@ public final class Cli {
                             + (mode.sharedBackground ? " (background " + r.background() + ")" : ""));
                 }
                 case "topng" -> {
-                    if (!Images.isC64File(in)) throw new IllegalArgumentException("topng needs a .kla or .art file.");
                     Path target = out != null ? out : Images.sibling(in, ".png");
-                    Images.writePng(Images.read(in, pal), target);
+                    String n = in.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                    if (n.endsWith(".petmate")) {
+                        PetsciiImage p = PetsciiImage.fromPetmate(Files.readString(in, java.nio.charset.StandardCharsets.UTF_8));
+                        Images.writePng(p.render(pal), target);
+                    } else {
+                        if (!Images.isC64File(in)) throw new IllegalArgumentException("topng needs a .kla, .art or .petmate file.");
+                        Images.writePng(Images.read(in, pal), target);
+                    }
                     System.out.println("Wrote " + target);
                 }
                 default -> { return 1; }
@@ -207,6 +260,12 @@ public final class Cli {
             return 2;
         }
         return 0;
+    }
+
+    /** Step "prepare"; pictures stay unchanged with neutral settings (results identical to the old tools). */
+    private static BufferedImage prepared(BufferedImage src, ImageAdjust.Settings a) {
+        if (ImageAdjust.Settings.NEUTRAL.equals(a)) return src;
+        return ImageAdjust.toImage(ImageAdjust.toAdjustedRgb(src, a, true), src.getWidth(), src.getHeight());
     }
 
     private static BufferedImage fitted(BufferedImage src, ImageFitter.ScaleMode fit) {

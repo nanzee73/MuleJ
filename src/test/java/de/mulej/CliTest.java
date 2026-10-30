@@ -51,6 +51,10 @@ class CliTest {
         assertEquals(0, Cli.run(new String[]{"check", in.toString()}));                  // a smooth gradient does not
         assertEquals(0, Cli.run(new String[]{"palettize", in.toString(), "-o", dir.resolve("d.png").toString(),
                 "--dither", "atkinson", "--strength", "60"}));
+        assertEquals(0, Cli.run(new String[]{"petscii", in.toString(), "--contrast", "20", "--prg", dir.resolve("t.prg").toString()}));
+        assertTrue(Files.readString(dir.resolve("pic.petmate")).startsWith("{\"version\":2"));
+        assertEquals(0, Cli.run(new String[]{"topng", dir.resolve("pic.petmate").toString(), dir.resolve("t.png").toString()}));
+        assertEquals(1, Cli.run(new String[]{"petscii", in.toString(), "--charset", "klingon"}));
     }
 
     @Test
