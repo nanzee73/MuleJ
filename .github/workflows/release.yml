@@ -84,9 +84,9 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           ./gradlew --no-daemon -PappVersion=$APP_VERSION shadowJar distZip
-          mkdir -p dist
-          cp "build/libs/mulej-$APP_VERSION-all.jar" "dist/MuleJ-$APP_VERSION-all-platforms-java17.jar"
-          cp "build/distributions/mulej-$APP_VERSION.zip" "dist/MuleJ-$APP_VERSION-all-platforms-java17.zip"
+          mkdir -p dist-all
+          cp "build/libs/mulej-$APP_VERSION-all.jar" "dist-all/MuleJ-$APP_VERSION-all-platforms-java17.jar"
+          cp "build/distributions/mulej-$APP_VERSION.zip" "dist-all/MuleJ-$APP_VERSION-all-platforms-java17.zip"
 
       - name: Installer with bundled Java
         run: |
@@ -122,9 +122,17 @@ jobs:
           name: MuleJ-${{ env.APP_VERSION }}-${{ matrix.label }}
           path: dist/*
 
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: MuleJ-${{ env.APP_VERSION }}-all-platforms-java17
+          path: dist-all/*
+
       - name: Attach to release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            dist/*
+            dist-all/*
           generate_release_notes: true
