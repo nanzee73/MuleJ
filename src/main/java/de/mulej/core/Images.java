@@ -1,5 +1,8 @@
 package de.mulej.core;
 
+import de.c64gfx.format.HiresImage;
+import de.c64gfx.format.KoalaImage;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -16,9 +19,9 @@ public final class Images {
      * Reads a picture. Koala (.kla/.koa) and Art Studio (.art) files are drawn with the given palette,
      * everything else goes through ImageIO.
      */
-    public static BufferedImage read(Path file, de.mulej.palette.Palette koalaPalette) throws IOException {
-        if (isKoala(file)) return KoalaImage.read(Files.readAllBytes(file)).render(koalaPalette);
-        if (isArtStudio(file)) return HiresImage.read(Files.readAllBytes(file)).render(koalaPalette);
+    public static BufferedImage read(Path file, de.c64gfx.palette.Palette koalaPalette) throws IOException {
+        if (isKoala(file)) return de.c64gfx.swing.Images.fromRgb(KoalaImage.read(Files.readAllBytes(file)).render(koalaPalette), 320, 200);
+        if (isArtStudio(file)) return de.c64gfx.swing.Images.fromRgb(HiresImage.read(Files.readAllBytes(file)).render(koalaPalette), 320, 200);
         BufferedImage img = ImageIO.read(file.toFile());
         if (img == null) throw new IOException(file.getFileName() + " is no readable image file.");
         return toRgb(img);

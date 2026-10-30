@@ -1,15 +1,24 @@
 package de.mulej.gui;
 
+import de.c64gfx.dither.Dither;
+import de.c64gfx.dither.Ditherer;
+import de.c64gfx.swing.FileDialogs;
+import de.c64gfx.swing.Icons;
+import de.c64gfx.swing.ImagePanel;
+import de.c64gfx.swing.PaletteEditorDialog;
+import de.c64gfx.swing.SliderControls;
+import de.c64gfx.swing.WrapLayout;
+
 import de.mulej.App;
-import de.mulej.color.ColorMatcher;
+import de.c64gfx.color.ColorMatcher;
 import de.mulej.core.*;
 import de.mulej.core.Pipeline.Step;
 import de.mulej.core.Pipeline.Target;
-import de.mulej.i18n.I18n;
-import de.mulej.image.ImageAdjust;
-import de.mulej.image.ImageFitter;
-import de.mulej.palette.Palette;
-import de.mulej.palette.Palettes;
+import de.c64gfx.swing.I18n;
+import de.c64gfx.swing.ImageAdjust;
+import de.c64gfx.swing.ImageFitter;
+import de.c64gfx.palette.Palette;
+import de.c64gfx.palette.Palettes;
 
 import javax.swing.*;
 import java.awt.*;
@@ -23,7 +32,7 @@ import java.util.List;
 import java.util.*;
 import java.util.function.Supplier;
 
-import static de.mulej.i18n.I18n.tr;
+import static de.c64gfx.swing.I18n.tr;
 
 /**
  * Main window: one conversion chain instead of separate tools.
@@ -155,7 +164,7 @@ public class MainWindow extends JFrame {
         for (Palette p : Palettes.builtIns()) paletteModel.addElement(p);
         paletteBox.setSelectedItem(Palettes.COLODORE);
         spaceBox.setRenderer(renderer(v -> tr("space." + ((ColorMatcher.Space) v).name()), null));
-        ditherBox.setRenderer(renderer(Object::toString, null));
+        ditherBox.setRenderer(I18n.enumRenderer("dither"));
         charsetBox.setRenderer(renderer(Object::toString, null));
         for (JComboBox<Integer> b : List.of(backgroundBox, petBackgroundBox)) {
             for (int i = -1; i < 16; i++) b.addItem(i);
@@ -223,7 +232,7 @@ public class MainWindow extends JFrame {
 
         JMenu language = I18n.text(new JMenu(), "menu.language");
         ButtonGroup lg = new ButtonGroup();
-        for (Locale l : I18n.SUPPORTED) {
+        for (Locale l : I18n.supportedLocales()) {
             String name = l.getDisplayLanguage(l);
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(name.substring(0, 1).toUpperCase(l) + name.substring(1),
                     l.getLanguage().equals(I18n.locale().getLanguage()));

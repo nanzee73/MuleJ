@@ -1,8 +1,8 @@
 package de.mulej.core;
 
-import de.mulej.color.ColorMatcher;
-import de.mulej.palette.Palette;
-import de.mulej.palette.Palettes;
+import de.c64gfx.color.ColorMatcher;
+import de.c64gfx.palette.Palette;
+import de.c64gfx.palette.Palettes;
 import org.junit.jupiter.api.Test;
 
 import java.awt.image.BufferedImage;

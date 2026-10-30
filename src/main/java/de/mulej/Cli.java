@@ -1,11 +1,14 @@
 package de.mulej;
 
-import de.mulej.color.ColorMatcher;
+import de.c64gfx.dither.Dither;
+import de.c64gfx.dither.Ditherer;
+
+import de.c64gfx.color.ColorMatcher;
 import de.mulej.core.*;
-import de.mulej.image.ImageAdjust;
-import de.mulej.image.ImageFitter;
-import de.mulej.palette.Palette;
-import de.mulej.palette.Palettes;
+import de.c64gfx.swing.ImageAdjust;
+import de.c64gfx.swing.ImageFitter;
+import de.c64gfx.palette.Palette;
+import de.c64gfx.palette.Palettes;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -72,6 +75,7 @@ public final class Cli {
 
     /** Command line only (never starts the GUI), e.g. on headless machines. */
     public static void main(String[] args) {
+        App.configure();
         System.exit(run(args));
     }
 

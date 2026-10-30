@@ -1,6 +1,6 @@
 package de.mulej.core;
 
-import de.mulej.palette.Palette;
+import de.c64gfx.palette.Palette;
 
 import java.awt.image.BufferedImage;
 import java.util.Arrays;

@@ -1,7 +1,10 @@
 package de.mulej;
 
-import de.mulej.core.HiresImage;
-import de.mulej.core.KoalaImage;
+import de.c64gfx.format.HiresImage;
+import de.c64gfx.format.KoalaImage;
+
+import de.c64gfx.format.HiresImage;
+import de.c64gfx.format.KoalaImage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

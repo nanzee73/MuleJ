@@ -1,7 +1,7 @@
 package de.mulej.gui;
 
-import de.mulej.i18n.I18n;
-import de.mulej.image.ImageFitter;
+import de.c64gfx.swing.I18n;
+import de.c64gfx.swing.ImageFitter;
 
 import javax.swing.*;
 import java.awt.*;
@@ -9,7 +9,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 
-import static de.mulej.i18n.I18n.tr;
+import static de.c64gfx.swing.I18n.tr;
 
 /**
  * Frame & scaling to 320×200 (step "frame"): an interactive view of the source picture with the frame

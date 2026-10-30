@@ -2,7 +2,11 @@ package de.mulej;
 
 import de.mulej.gui.MainWindow;
 
+import de.c64gfx.swing.AppConfig;
+
 import javax.swing.*;
+import java.util.List;
+import java.util.Locale;
 
 /** Entry point: without arguments the GUI starts, with arguments the command line tools run. */
 public final class App {
@@ -11,11 +15,18 @@ public final class App {
 
     private App() {}
 
+    /** Tells C64GfxLib the app name, settings node, icons and texts. Call before anything else. */
+    public static void configure() {
+        AppConfig.install(new AppConfig(NAME, "de/mulej", "/de/mulej/icons/mulej-",
+                "de.mulej.i18n.messages", List.of(Locale.ENGLISH, Locale.GERMAN), false));
+    }
+
     public static void main(String[] args) {
+        configure();
         if (args.length > 0) {
             System.exit(Cli.run(args));
         }
-        de.mulej.i18n.I18n.init();
+        de.c64gfx.swing.I18n.init();
         SwingUtilities.invokeLater(() -> {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -24,7 +35,7 @@ public final class App {
             }
             // GTK (Linux) draws the slider value above the thumb, where it gets cut off
             UIManager.put("Slider.paintValue", Boolean.FALSE);
-            de.mulej.gui.Icons.installTaskbarIcon();
+            de.c64gfx.swing.Icons.installTaskbarIcon();
             new MainWindow().setVisible(true);
         });
     }

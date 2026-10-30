@@ -1,10 +1,12 @@
 package de.mulej.core;
 
-import de.mulej.color.ColorMatcher;
-import de.mulej.image.ImageAdjust;
-import de.mulej.image.ImageFitter;
-import de.mulej.palette.Palette;
-import de.mulej.palette.Palettes;
+import de.c64gfx.dither.Ditherer;
+
+import de.c64gfx.color.ColorMatcher;
+import de.c64gfx.swing.ImageAdjust;
+import de.c64gfx.swing.ImageFitter;
+import de.c64gfx.palette.Palette;
+import de.c64gfx.palette.Palettes;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -28,13 +30,13 @@ public final class Pipeline {
 
         Target(C64Mode mode) { this.mode = mode; }
 
-        @Override public String toString() { return de.mulej.i18n.I18n.tr("target." + name()); }
+        @Override public String toString() { return de.c64gfx.swing.I18n.tr("target." + name()); }
     }
 
     public enum Step {
         ORIGINAL, FRAME, PREPARE, PIXELIZER, COLOURS, RESULT;
 
-        @Override public String toString() { return de.mulej.i18n.I18n.tr("step." + name()); }
+        @Override public String toString() { return de.c64gfx.swing.I18n.tr("step." + name()); }
     }
 
     /** The steps of a target in order (the pixelizer only exists for multicolor). */

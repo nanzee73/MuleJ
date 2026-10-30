@@ -154,6 +154,15 @@ The installers and portable versions contain their own Java runtime – nothing 
 Note: jpackage on macOS does not accept versions starting with 0, so `0.x.y` becomes `1.x.y` in the `.dmg` only.
 Use tags from `v1.0.0` on to keep the versions identical everywhere.
 
+## Shared library
+
+Palettes, colour matching, dithering, Koala/Art Studio files, the 6502 assembler, the image panel, file dialogs,
+crop & scale, translations of shared texts and more come from [C64GfxLib](https://github.com/nanzee73/C64GfxLib)
+(also used by FlipperJ), via GitHub Packages.
+Building needs a login once, see *Access to the package* in the C64GfxLib README:
+`gpr.user` / `gpr.key` (token with `read:packages`) in `~/.gradle/gradle.properties`.
+To work on the library at the same time, check it out next to MuleJ and build with `-Pc64gfxLocal`.
+
 ## Build
 
 Requires a JDK 17 or newer. IntelliJ IDEA: *File ▸ Open…*, select the folder with `build.gradle.kts`, run `de.mulej.App`.
@@ -193,14 +202,11 @@ Petmate (MIT License, © C. T. Lin).
 ```
 src/main/java/de/mulej/
   App.java, Cli.java          entry point, command line
-  core/                       Pipeline (the chain, automatic start), Palettizer, Pixelizer, Ditherer,
-                              BitmapConverter (check & correction), PetsciiConverter, KoalaImage, HiresImage,
-                              PetsciiImage (Petmate), Charset, ViewerPrg (6502 viewer), Images
-  palette/                    palettes, .vpl/.gpl/hex loading
-  color/ColorMatcher.java     colour distance in euclidean RGB / weighted RGB / YUV / HSL
-  image/                      ImageFitter (crop & scale to 320×200, 1:1 frame), ImageAdjust (prepare)
-  gui/                        Swing UI: MainWindow (target, steps, previews), CropEditor, palette editor
-  i18n/                       English/German texts
+  core/                       Pipeline (the chain, automatic start), Palettizer, Pixelizer,
+                              BitmapConverter (check & correction), PetsciiConverter, PetsciiImage (Petmate),
+                              Charset, C64Mode, ViewerPrg (6502 viewer), Images (reading/writing files)
+  gui/                        Swing UI: MainWindow (target, steps, previews), CropEditor
+src/main/resources/de/mulej/i18n/   English/German texts (shared texts come from C64GfxLib)
 src/test/java/...             JUnit 5 tests
 packaging/                    icon (grey mule, C64 light grey on C64 blue, like the FlipperJ dolphin) as SVG, PNG and .ico;
                               launcher settings for mulej-cli

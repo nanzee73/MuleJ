@@ -24,7 +24,7 @@ public final class Pixelizer {
             };
         }
 
-        @Override public String toString() { return de.mulej.i18n.I18n.tr("pixel." + name()); }
+        @Override public String toString() { return de.c64gfx.swing.I18n.tr("pixel." + name()); }
     }
 
     private Pixelizer() {}

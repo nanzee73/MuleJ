@@ -11,11 +11,24 @@ version = "0.1.0"
 
 repositories {
     mavenCentral()
+    // C64GfxLib (shared code with FlipperJ) from GitHub Packages. Login: gpr.user / gpr.key in
+    // ~/.gradle/gradle.properties on your computer, GITHUB_ACTOR / GITHUB_TOKEN in GitHub Actions.
+    maven {
+        url = uri("https://maven.pkg.github.com/nanzee73/C64GfxLib")
+        credentials {
+            username = (findProperty("gpr.user") as String?) ?: System.getenv("GITHUB_ACTOR")
+            password = (findProperty("gpr.key") as String?) ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
 }
+
+val c64gfxVersion = "0.1.0"
 
 val twelveMonkeys = "3.12.0"
 
 dependencies {
+    implementation("de.c64gfx:c64gfx-swing:$c64gfxVersion")   // includes c64gfx-core
+
     // Extra ImageIO readers (registered automatically via SPI): WebP, TIFF, PSD, TGA, PCX, PNM, IFF/ILBM,
     // SGI, PICT, ICNS and an improved BMP/JPEG reader. Only needed at runtime.
     listOf("webp", "tiff", "psd", "tga", "pcx", "pnm", "iff", "sgi", "pict", "icns", "bmp", "jpeg").forEach {

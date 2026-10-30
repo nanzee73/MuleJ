@@ -1,7 +1,11 @@
 package de.mulej.core;
 
-import de.mulej.color.ColorMatcher;
-import de.mulej.palette.Palette;
+import de.c64gfx.dither.Ditherer;
+import de.c64gfx.format.HiresImage;
+import de.c64gfx.format.KoalaImage;
+
+import de.c64gfx.color.ColorMatcher;
+import de.c64gfx.palette.Palette;
 
 import java.awt.image.BufferedImage;
 import java.util.*;
@@ -68,8 +72,8 @@ public final class BitmapConverter {
 
         /** 320×200 picture of the indices (multicolor pixels drawn two wide). */
         public BufferedImage render(Palette p) {
-            if (koala != null) return koala.render(p);
-            if (hires != null) return hires.render(p);
+            if (koala != null) return de.c64gfx.swing.Images.fromRgb(koala.render(p), 320, 200);
+            if (hires != null) return de.c64gfx.swing.Images.fromRgb(hires.render(p), 320, 200);
             int f = mode.pixelWidth();
             int[] wide = new int[320 * 200];
             for (int i = 0; i < wide.length; i++) wide[i] = indices[(i / 320) * mode.width + (i % 320) / f];
@@ -102,7 +106,7 @@ public final class BitmapConverter {
         C64Mode mode = s.mode();
         BufferedImage work = modeImage(src, mode, s.pair());
         ColorMatcher m = new ColorMatcher(s.palette(), s.space(), 50, 50, false);
-        float[] rgb = Ditherer.toFloat(work);
+        float[] rgb = de.c64gfx.swing.Images.toFloat(work);
         int[] idx = s.palettize() ? Palettizer.indices(work, m) : exactIndices(work, s.palette(), mode);
         int bg = !mode.sharedBackground ? -1 : s.background() >= 0 ? s.background() & 15 : mostCommon(idx);
 
@@ -237,7 +241,7 @@ public final class BitmapConverter {
     public static int[] suggestColours(BufferedImage src, Settings s, int cell, int bg) {
         BufferedImage work = modeImage(src, s.mode(), s.pair());
         ColorMatcher m = new ColorMatcher(s.palette(), s.space(), 50, 50, false);
-        int[] best = bestColours(s.mode(), Ditherer.toFloat(work), cell, bg, m);
+        int[] best = bestColours(s.mode(), de.c64gfx.swing.Images.toFloat(work), cell, bg, m);
         return s.mode().sharedBackground ? Arrays.copyOf(best, best.length - 1) : best;
     }
 

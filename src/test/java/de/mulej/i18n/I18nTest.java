@@ -1,5 +1,8 @@
 package de.mulej.i18n;
 
+import de.c64gfx.swing.I18n;
+import de.mulej.App;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
@@ -13,12 +16,33 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class I18nTest {
 
-    private static Set<String> keys(String file) throws Exception {
+    @BeforeAll
+    static void configure() { App.configure(); }
+
+    private static Properties load(String path) throws Exception {
         Properties p = new Properties();
-        try (InputStream in = I18nTest.class.getResourceAsStream("/de/mulej/i18n/" + file)) {
+        try (InputStream in = I18nTest.class.getResourceAsStream(path)) {
             p.load(new InputStreamReader(in, StandardCharsets.UTF_8));
         }
-        return new TreeSet<>(p.stringPropertyNames());
+        return p;
+    }
+
+    /** Keys of MuleJ's own bundle plus the texts that come from C64GfxLib, e.g. "messages_de.properties". */
+    private static Set<String> keys(String file) throws Exception {
+        Set<String> k = new TreeSet<>(load("/de/mulej/i18n/" + file).stringPropertyNames());
+        k.addAll(load("/de/c64gfx/swing/i18n/" + file).stringPropertyNames());
+        return k;
+    }
+
+    /** A text MuleJ overrides in English must be overridden in German too, else English would win over the library's German. */
+    @Test
+    void overridesExistInEveryLanguage() throws Exception {
+        Set<String> lib = load("/de/c64gfx/swing/i18n/messages.properties").stringPropertyNames();
+        Set<String> en = new TreeSet<>(load("/de/mulej/i18n/messages.properties").stringPropertyNames());
+        en.retainAll(lib);
+        Set<String> de = load("/de/mulej/i18n/messages_de.properties").stringPropertyNames();
+        en.removeAll(de);
+        assertEquals(Set.of(), en);
     }
 
     /** Without a stored choice the user interface starts in English (like FlipperJ). */
@@ -74,16 +98,16 @@ class I18nTest {
         for (var t : de.mulej.core.Pipeline.Target.values()) { need.add("target." + t.name()); need.add("target." + t.name() + ".tip"); }
         for (var st : de.mulej.core.Pipeline.Step.values()) { need.add("step." + st.name()); need.add("step." + st.name() + ".tip"); }
         for (var c : de.mulej.core.Charset.values()) need.add("charset." + c.name());
-        for (var s : de.mulej.color.ColorMatcher.Space.values()) need.add("space." + s.name());
+        for (var s : de.c64gfx.color.ColorMatcher.Space.values()) need.add("space." + s.name());
         for (var d : de.mulej.core.Pixelizer.Direction.values()) need.add("pixel." + d.name());
         need.add("pixel.L2R.tip");
         need.add("pixel.R2L.tip");
-        for (var m : de.mulej.image.ImageFitter.ScaleMode.values()) need.add("scale." + m.name());
-        for (var f : de.mulej.image.ImageFitter.Filter.values()) need.add("scalefilter." + f.name());
-        for (var a : de.mulej.image.ImageFitter.Aspect.values()) need.add("aspect." + a.name());
+        for (var m : de.c64gfx.swing.ImageFitter.ScaleMode.values()) need.add("scale." + m.name());
+        for (var f : de.c64gfx.swing.ImageFitter.Filter.values()) need.add("scalefilter." + f.name());
+        for (var a : de.c64gfx.swing.ImageFitter.Aspect.values()) need.add("aspect." + a.name());
         for (int i = 0; i < 16; i++) need.add("color." + i);
         for (var m : de.mulej.core.C64Mode.values()) need.add("mode." + m.name());
-        for (var d : de.mulej.core.Dither.values()) need.add("dither." + d.name());
+        for (var d : de.c64gfx.dither.Dither.values()) need.add("dither." + d.name());
         need.removeAll(en);
         assertEquals(Set.of(), need);
     }

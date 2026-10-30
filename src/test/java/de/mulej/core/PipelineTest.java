@@ -1,12 +1,15 @@
 package de.mulej.core;
 
-import de.mulej.color.ColorMatcher;
+import de.c64gfx.dither.Dither;
+import de.c64gfx.dither.Ditherer;
+
+import de.c64gfx.color.ColorMatcher;
 import de.mulej.core.Pipeline.Step;
 import de.mulej.core.Pipeline.Target;
-import de.mulej.image.ImageAdjust;
-import de.mulej.image.ImageFitter;
-import de.mulej.palette.Palette;
-import de.mulej.palette.Palettes;
+import de.c64gfx.swing.ImageAdjust;
+import de.c64gfx.swing.ImageFitter;
+import de.c64gfx.palette.Palette;
+import de.c64gfx.palette.Palettes;
 import org.junit.jupiter.api.Test;
 
 import java.awt.*;

@@ -1,7 +1,9 @@
 package de.mulej.core;
 
-import de.mulej.color.ColorMatcher;
-import de.mulej.palette.Palette;
+import de.c64gfx.dither.Ditherer;
+
+import de.c64gfx.color.ColorMatcher;
+import de.c64gfx.palette.Palette;
 
 import java.awt.image.BufferedImage;
 import java.util.stream.IntStream;
@@ -39,7 +41,7 @@ public final class Palettizer {
     /** Palette indices with optional dithering (all 16 colours allowed everywhere). */
     public static int[] indices(BufferedImage src, Palette palette, ColorMatcher m, Ditherer.Settings dither) {
         if (dither == null || !dither.active()) return indices(src, m);
-        return Ditherer.run(Ditherer.toFloat(src), src.getWidth(), src.getHeight(), m, palette, dither, null, 1, 1);
+        return Ditherer.run(de.c64gfx.swing.Images.toFloat(src), src.getWidth(), src.getHeight(), m, palette, dither, null, 1, 1);
     }
 
     public static BufferedImage palettize(BufferedImage src, Palette palette, ColorMatcher.Space space,

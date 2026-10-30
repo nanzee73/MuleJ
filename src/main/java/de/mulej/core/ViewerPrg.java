@@ -1,5 +1,9 @@
 package de.mulej.core;
 
+import de.c64gfx.format.HiresImage;
+import de.c64gfx.format.KoalaImage;
+import de.c64gfx.prg.Asm6502;
+
 /**
  * Runnable C64 program that shows a multicolor or hires bitmap or a PETSCII text screen: {@code LOAD"NAME",8,1} (or ,8) and {@code RUN}.
  * Any key returns to BASIC with the normal text screen.

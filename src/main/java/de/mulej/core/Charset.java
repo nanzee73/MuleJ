@@ -52,5 +52,5 @@ public enum Charset {
         throw new IllegalArgumentException("Unknown character set: " + n + " (upper, lower)");
     }
 
-    @Override public String toString() { return de.mulej.i18n.I18n.tr("charset." + name()); }
+    @Override public String toString() { return de.c64gfx.swing.I18n.tr("charset." + name()); }
 }

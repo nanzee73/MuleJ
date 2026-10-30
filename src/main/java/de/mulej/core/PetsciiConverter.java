@@ -1,7 +1,7 @@
 package de.mulej.core;
 
-import de.mulej.color.ColorMatcher;
-import de.mulej.palette.Palette;
+import de.c64gfx.color.ColorMatcher;
+import de.c64gfx.palette.Palette;
 
 import java.awt.image.BufferedImage;
 import java.util.stream.IntStream;

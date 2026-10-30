@@ -40,5 +40,5 @@ public enum C64Mode {
 
     public int cellY(int cell) { return (cell / COLS) * CELL_H; }
 
-    @Override public String toString() { return de.mulej.i18n.I18n.tr("mode." + name()); }
+    @Override public String toString() { return de.c64gfx.swing.I18n.tr("mode." + name()); }
 }
