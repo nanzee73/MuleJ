@@ -247,6 +247,12 @@ public class MainWindow extends JFrame {
         }
 
         JMenu help = I18n.text(new JMenu(), "menu.help");
+        JMenuItem guide = I18n.text(new JMenuItem(), "menu.help.guide");
+        guide.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F1, 0));
+        guide.addActionListener(e -> de.c64gfx.swing.HelpDialog.show(this,
+                App.NAME + " – " + tr("menu.help.guide"), "/de/mulej/help/help"));
+        help.add(guide);
+        help.addSeparator();
         JMenuItem about = I18n.text(new JMenuItem(), "menu.help.about");
         about.addActionListener(e -> JOptionPane.showMessageDialog(this, tr("about.text", App.VERSION),
                 tr("about.title"), JOptionPane.INFORMATION_MESSAGE, aboutIcon()));

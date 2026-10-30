@@ -181,6 +181,11 @@ Requires a JDK 17 or newer. IntelliJ IDEA: *File ▸ Open…*, select the folder
 ./gradlew jpackage -PinstallerType=app-image  # portable folder for this system
 ```
 
+## User guide
+
+*Help ▸ User guide* (F1) explains every function in English or German.
+The pages are `src/main/resources/de/mulej/help/help_<language>.html`.
+
 ## File formats
 
 **Input:** every picture Java ImageIO reads (PNG, JPEG, GIF, BMP, WebP, TIFF, …) and C64 pictures from C64GfxLib:

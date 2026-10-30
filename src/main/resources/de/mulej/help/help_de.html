@@ -1,0 +1,183 @@
+<html><body>
+<h1>MuleJ – Anleitung</h1>
+<p>MuleJ macht aus beliebigen Bildern C64-Grafik: ein <b>Multicolor</b>-Bild (Koala Painter), ein <b>Hires</b>-Bild
+(Art Studio) oder einen <b>PETSCII</b>-Textbildschirm (Petmate) – jeweils auch als startbares C64-Programm. MuleJ prüft,
+ob jede Zelle die C64-Farbregeln einhält, und kann die Zellen korrigieren, die es nicht tun. Alles geht auch auf der
+Kommandozeile.</p>
+
+<p><b>Inhalt</b></p>
+<ul>
+<li><a href="#quick">Schnellstart</a></li>
+<li><a href="#targets">Ziele: Multicolor, Hires, PETSCII</a></li>
+<li><a href="#chain">Die Kette der Schritte</a></li>
+<li><a href="#input">Bilder öffnen und „Weiter ab“</a></li>
+<li><a href="#frame">Schritt 2: Ausschnitt</a></li>
+<li><a href="#prepare">Schritt 3: Vorbereiten</a></li>
+<li><a href="#pixel">Schritt 4: Pixelizer</a></li>
+<li><a href="#colours">Schritt 5: Farben</a></li>
+<li><a href="#petscii">PETSCII-Einstellungen</a></li>
+<li><a href="#result">Schritt 6: Ergebnis – Farbcheck, Korrektur, Bearbeiten</a></li>
+<li><a href="#save">Speichern</a></li>
+<li><a href="#preview">Vorschau, Zoomen und Verschieben</a></li>
+<li><a href="#cli">Kommandozeile</a></li>
+<li><a href="#tips">Tipps</a></li>
+</ul>
+
+<a name="quick"></a><h2>Schnellstart</h2>
+<ol>
+<li>Oben das <b>Ziel</b> wählen: Multicolor, Hires oder PETSCII.</li>
+<li><b>Bild öffnen…</b> oder eine Datei ins Fenster ziehen. MuleJ schaut sich das Bild an und entscheidet, wo es
+anfängt (siehe <a href="#input">Weiter ab</a>).</li>
+<li>Mit <b>Weiter ▶</b> und <b>◀ Zurück</b> durch die Schritte gehen oder oben in der Leiste einen Schritt anklicken.
+Jeder Schritt zeigt links seine Eingabe und rechts seine Ausgabe.</li>
+<li>Im letzten Schritt, <b>Ergebnis</b>, muss der Farbcheck bestanden sein. Dann die C64-Datei (.kla, .art oder Petmate)
+und/oder eine startbare <b>PRG</b> speichern.</li>
+</ol>
+
+<a name="targets"></a><h2>Ziele</h2>
+<table border="1" cellspacing="0">
+<tr><th>Ziel</th><th>Bild</th><th>Regeln</th><th>Datei</th></tr>
+<tr><td>Multicolor</td><td>160×200, doppelt breite Pixel</td><td>pro 4×8-Zelle 3 Farben plus eine Hintergrundfarbe für das ganze Bild</td><td>Koala Painter (.kla)</td></tr>
+<tr><td>Hires</td><td>320×200</td><td>pro 8×8-Zelle 2 Farben</td><td>Art Studio (.art)</td></tr>
+<tr><td>PETSCII</td><td>40×25 Zeichen</td><td>pro 8×8-Zelle ein Zeichen in einer Farbe plus eine gemeinsame Hintergrundfarbe</td><td>Petmate-Arbeitsbereich (.petmate)</td></tr>
+</table>
+
+<a name="chain"></a><h2>Die Kette der Schritte</h2>
+<p><b>1 Original</b> → <b>2 Ausschnitt</b> → <b>3 Vorbereiten</b> → <b>4 Pixelizer</b> (nur Multicolor) →
+<b>5 Farben</b> → <b>6 Ergebnis</b>. Jeder Schritt arbeitet mit der Ausgabe des vorigen. Änderst du etwas in einem
+frühen Schritt, aktualisieren sich alle späteren automatisch. Ein „übersprungener“ Schritt reicht das Bild unverändert
+durch; <b>Diesen Schritt ausführen</b> schaltet ihn wieder ein.</p>
+
+<a name="input"></a><h2>Bilder öffnen und „Weiter ab“</h2>
+<p>MuleJ liest alle üblichen PC-Formate (PNG, JPEG, GIF, BMP, WebP, TIFF, …) und C64-Bilder: Koala, Art Studio,
+Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph, AFLI, Gunpaint, Funpaint und FlipperJs Rohdateien. C64-Bilder
+werden mit der gewählten Palette gezeichnet; Art Studio und AFLI stellen das Ziel auf Hires, die anderen auf Multicolor.</p>
+<p><b>Weiter ab</b> legt fest, welche Schritte das Bild noch braucht. <i>Automatisch</i> schaut sich das Bild an:</p>
+<ul>
+<li>nicht 320×200 → Start bei <i>Ausschnitt</i>;</li>
+<li>320×200 mit freien Farben → Start bei <i>Vorbereiten</i>;</li>
+<li>C64-Farben, aber unterschiedliche Pixelpaare (Multicolor) → Start beim <i>Pixelizer</i>;</li>
+<li>C64-Größe und C64-Farben → Start beim Farbcheck (<i>Ergebnis</i>), nichts wird verändert.</li>
+</ul>
+<p>Wähle einen Schritt von Hand, wenn dein Bild schon anderswo vorbereitet oder bearbeitet wurde. Alle Schritte davor
+werden unverändert durchgereicht.</p>
+
+<a name="frame"></a><h2>Schritt 2: Ausschnitt</h2>
+<p>Wähle den 320×200-Teil des Bildes: innerhalb des Rahmens ziehen verschiebt ihn, die Ecke ändert die Größe, außerhalb
+ziehen zeichnet einen neuen; Mausrad = zoomen, mit rechter oder mittlerer Taste ziehen = verschieben, Doppelklick = ganzes
+Bild.</p>
+<ul>
+<li><b>Seitenverhältnis</b> des Ergebnisses (C64 PAL, quadratische Pixel, NTSC oder frei) und <b>Ausschnitt an
+Zielformat binden</b>.</li>
+<li><b>Skalierung:</b> Strecken, Einpassen (mit Rand, siehe <b>Randfarbe…</b>), Füllen (beschneiden) oder 1:1.
+<b>320×200-Rahmen (1:1)</b> nimmt genau 320×200 Pixel ohne Skalierung – ein Klick verschiebt den Rahmen dorthin.</li>
+<li><b>Filter:</b> Flächenmittel (weich) für Fotos, Nächster Nachbar für Pixel-Art.</li>
+<li><b>Ganzes Bild</b> und <b>Max. zentrierter Rahmen</b> sind Abkürzungen; X, Y, Breite und Höhe setzen den Rahmen genau.</li>
+</ul>
+
+<a name="prepare"></a><h2>Schritt 3: Vorbereiten</h2>
+<p><b>Kontrast</b> und <b>Helligkeit</b> (-100 bis 100), <b>Gamma %</b> (unter 100 = hellere Mitteltöne) und
+<b>Sättigung %</b> (0 = grau). Der C64 hat wenige dunkle und wenige satte Farben, daher hilft oft etwas mehr Kontrast
+und Sättigung.</p>
+
+<a name="pixel"></a><h2>Schritt 4: Pixelizer (nur Multicolor)</h2>
+<p>Multicolor-Pixel sind doppelt so breit, also wird aus jedem Pixelpaar eines. Welcher Pixel übrig bleibt, entscheidet
+darüber, wie dünne Linien aussehen:</p>
+<ul>
+<li><b>Links → rechts:</b> der linke Pixel jedes Paares bleibt.</li>
+<li><b>Rechts → links:</b> der rechte Pixel bleibt.</li>
+<li><b>Mittelwert:</b> beide werden gemischt – weicher, gut für Fotos.</li>
+</ul>
+
+<a name="colours"></a><h2>Schritt 5: Farben</h2>
+<ul>
+<li><b>Palette:</b> welche RGB-Farben die 16 C64-Farben haben (Colodore, Pepto, DeeKay, …). <b>Eigene…</b> öffnet den
+Paletten-Editor: Farben ändern, .vpl-/.gpl-/Hex-Dateien laden, als .vpl speichern.</li>
+<li><b>Abgleich:</b> wie „ähnlich“ gemessen wird – <i>RGB euklidisch</i> (wie der alte c64palettizer),
+<i>RGB gewichtet</i>, <i>YUV</i> oder <i>HSL</i>.</li>
+<li><b>Dithering</b> (Floyd-Steinberg, Atkinson, Jarvis, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8) mischt Farben in feinen
+Mustern. <b>Stärke</b> legt fest, wie viel; <b>Schlangenlinie (Serpentine)</b> vermeidet diagonale Muster.</li>
+<li><b>Bleeding (über Zellgrenzen):</b> Der Dither-Fehler darf in Nachbarzellen weiterlaufen – weicher, aber die
+Zellkanten werden weniger sauber.</li>
+<li><b>Hintergrund:</b> automatisch (beste Farbe) oder fest (Multicolor und PETSCII).</li>
+<li><b>Automatisch korrigieren:</b> Zellen mit zu vielen Farben bekommen die Farben, die sie am besten wiedergeben. Mit
+Dithering hält das Ergebnis die Regeln immer ein.</li>
+</ul>
+
+<a name="petscii"></a><h2>PETSCII-Einstellungen</h2>
+<p>Jede Zelle bekommt das Zeichen und die Farbe, die dem Original am ähnlichsten sehen – Pixel für Pixel und
+weichgezeichnet bewertet, so wie das Auge es sieht.</p>
+<ul>
+<li><b>Zeichensatz:</b> <i>Großbuchstaben + Grafik</i> oder <i>Klein- + Großbuchstaben</i> (die beiden C64-Zeichensätze).</li>
+<li><b>Buchstaben und Ziffern verwenden:</b> aus = nur Grafikzeichen, Leerzeichen und inverses Leerzeichen – meist ruhiger.</li>
+<li><b>Detail:</b> hoch = Zeichen folgen Kanten Pixel für Pixel; niedrig = nur Helligkeit und Farbe der Zellen (weich).</li>
+<li><b>Diffusion:</b> wie viel vom Restfehler einer Zelle an die Nachbarn weitergegeben wird (gut für Verläufe und Flächen).</li>
+<li><b>Ruhe:</b> unruhige Zeichen erscheinen nur dort, wo sie deutlich helfen.</li>
+</ul>
+<p>Zum Weiterbearbeiten eines PETSCII-Bildes als Petmate-Datei speichern und in Petmate öffnen.</p>
+
+<a name="result"></a><h2>Schritt 6: Ergebnis – Farbcheck, Korrektur, Bearbeiten</h2>
+<p>MuleJ prüft alle 1000 Zellen. „✔“ heißt, jede Zelle hält die Regeln ein; „✘“ zeigt, wie viele Zellen zu viele
+Farben haben.</p>
+<ul>
+<li><b>◀ ▶</b> springen zur vorigen / nächsten Zelle mit zu vielen Farben. <b>Markieren</b> zeigt sie in der Vorschau:
+rot = verletzt die Regeln, gelb = korrigiert, cyan = gewählte Zelle (nur in der Vorschau, nie in Dateien).</li>
+<li><b>Klick ins Ergebnis:</b> <i>Zelle wählen</i> – ein Linksklick wählt eine Zelle und zeigt ihre Farben mit der Zahl
+der Pixel; <i>Malen</i> – Linksklick oder Ziehen setzt Pixel auf die gewählte Farbe.</li>
+<li>Für eine gewählte Zelle: bis zur erlaubten Zahl Farben drücken (BG = Hintergrund, bei Multicolor immer erlaubt) und
+<b>Farben übernehmen</b> – jeder Pixel bekommt die nächstliegende davon. <b>Automatisch</b> wählt die besten Farben für
+diese Zelle, <b>Zelle zurücksetzen</b> verwirft deine Farben und gemalten Pixel, <b>Alle verwerfen</b> tut das für alle
+Zellen.</li>
+</ul>
+
+<a name="save"></a><h2>Speichern</h2>
+<ul>
+<li><b>Koala speichern (.kla)… / Art Studio speichern (.art)… / Petmate speichern…</b> – die C64-Datei, erst wenn der
+Farbcheck bestanden ist. Vorgeschlagen wird der Ordner des Quellbildes.</li>
+<li><b>PRG speichern…</b> – ein startbares C64-Programm, das das Bild zeigt: <code>LOAD"NAME",8</code> und <code>RUN</code>;
+eine beliebige Taste beendet es.</li>
+<li><b>Diesen Schritt als PNG…</b> – die Ausgabe des gezeigten Schritts ohne Markierungen, z. B. um sie am PC oder Handy
+zu bearbeiten und später wieder zu laden (dann diesen Schritt bei „Weiter ab“ wählen). Der Vergrößerungsfaktor daneben
+erleichtert das Bearbeiten; MuleJ verkleinert das Bild beim Laden wieder exakt.</li>
+<li>MuleJ fragt vor dem Überschreiben einer Datei und warnt besonders, bevor das geöffnete Bild überschrieben würde.</li>
+</ul>
+
+<a name="preview"></a><h2>Vorschau, Zoomen und Verschieben</h2>
+<ul>
+<li>Mausrad = zoomen, mit rechter Taste ziehen = verschieben, Doppelklick = ganz. Schaltflächen: −, +, <b>Ganz</b> und
+<b>4×</b> (4 Bildschirmpixel pro Bildpixel).</li>
+<li><b>Koppeln</b> zoomt und verschiebt beide Vorschauen gemeinsam, <b>Raster</b> zeigt beim Hineinzoomen Pixel- und
+8×8-Zellenlinien, <b>PAL</b> zeigt 320×200-Bilder im Seitenverhältnis eines PAL-Monitors.</li>
+<li>Jede Gruppe hat eine Schaltfläche <b>Standard</b>. Regler: Pfeile verstellen um 1, die Markierung zeigt den
+Standardwert, Doppelklick setzt zurück.</li>
+<li>Sprache: Menü <b>Sprache</b> (Englisch oder Deutsch).</li>
+</ul>
+
+<a name="cli"></a><h2>Kommandozeile</h2>
+<pre>mulej &lt;befehl&gt; [optionen] &lt;eingabe&gt; [ausgabe]</pre>
+<table border="1" cellspacing="0">
+<tr><th>Befehl</th><th>Macht</th></tr>
+<tr><td><code>palettize</code></td><td>bildet alle Farben auf die nächste Palettenfarbe ab → NAME_palettized.png</td></tr>
+<tr><td><code>pixelize</code></td><td>macht 2×1-Multicolor-Pixel → NAME_pixelized_l2r.png / _r2l.png</td></tr>
+<tr><td><code>koala</code></td><td>Multicolor-Bitmap → NAME.kla</td></tr>
+<tr><td><code>hires</code></td><td>Hires-Bitmap → NAME.art</td></tr>
+<tr><td><code>petscii</code></td><td>Textbildschirm → NAME.petmate</td></tr>
+<tr><td><code>check</code></td><td>listet die Zellen auf, die die Regeln von <code>--mode mc|hires</code> verletzen</td></tr>
+<tr><td><code>topng</code></td><td>C64-Bild oder Petmate-Datei → NAME.png</td></tr>
+</table>
+<p>Wichtige Optionen: <code>--palette NAME|DATEI</code>, <code>--space euclid|rgb|yuv|hsl</code>,
+<code>--fit stretch|fit|fill|none</code>, <code>--dither NAME</code>, <code>--strength N</code>, <code>--serpentine</code>,
+<code>--no-bleeding</code>, <code>--bg auto|0..15</code>, <code>--fix-clashes</code>, <code>--preview DATEI.png</code>,
+<code>--prg DATEI.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
+<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>.
+<code>mulej --help</code> listet alle auf. Die alte <code>-if DATEI</code>-Schreibweise von c64palettizer, c64pixelizer
+und c64koalaverter funktioniert weiterhin.</p>
+
+<a name="tips"></a><h2>Tipps</h2>
+<ul>
+<li>Für den C64 gezeichnete Pixel-Art: beim Farbcheck starten, kein Dithering und einzelne Zellen von Hand korrigieren.</li>
+<li>Fotos: Mittelwert im Pixelizer, etwas mehr Kontrast, Floyd-Steinberg- oder Atkinson-Dithering.</li>
+<li>Zu viele Konflikte: <i>Automatisch korrigieren</i> einschalten oder eine feste Hintergrundfarbe probieren.</li>
+</ul>
+<p>Feedback und Fehlermeldungen gern auf GitHub: <a href="https://github.com/nanzee73/MuleJ">github.com/nanzee73/MuleJ</a></p>
+</body></html>
