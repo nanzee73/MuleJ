@@ -4,6 +4,8 @@
 #  - Every push to main that changes code or build files: all packages are built and the pre-release
 #    "Development build" (tag latest-dev) is replaced by them. README or other doc changes build nothing.
 #  - "Run workflow" on the Actions tab: test build, packages are available as workflow artifacts.
+#    With "release" set to an existing release tag (e.g. v1.0.0), the files are built from main and attached to
+#    that release – for releases created on GitHub for a tag that already existed.
 #
 # File names (the same scheme as FlipperJ):
 #   MuleJ-<version>-<platform>.msi / .dmg / .deb      installer with bundled Java
@@ -28,10 +30,14 @@ on:
       - 'THIRD-PARTY-NOTICES.md'
       - '.github/workflows/release.yml'
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Existing release tag to build and fill with files, e.g. v1.0.0 (empty = test build only)'
+        required: false
 
 # a newer push to main cancels a development build that is still running
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 permissions:
@@ -74,12 +80,18 @@ jobs:
 
       - name: Version from tag
         run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then V="${GITHUB_REF_NAME#v}"
-          else V="$(grep '^version' build.gradle.kts | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1)"; fi
+          # release tag: the pushed tag, or the existing release chosen when starting the workflow by hand
+          T="${{ github.event.inputs.release }}"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then T="$GITHUB_REF_NAME"; fi
+          if [[ -n "$T" ]]; then
+            V="${T#v}"; F="$V"; D="$V"
+          else
+            V="$(grep '^version' build.gradle.kts | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1)"
+            F="dev"; D="dev-${GITHUB_SHA::7}"
+          fi
+          echo "RELEASE_TAG=$T" >> "$GITHUB_ENV"
           echo "APP_VERSION=$V" >> "$GITHUB_ENV"
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then F="$V"; else F="dev"; fi
-          echo "FILE_VERSION=$F" >> "$GITHUB_ENV"       # in file names: version of the tag, otherwise "dev"
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then D="$V"; else D="dev-${GITHUB_SHA::7}"; fi
+          echo "FILE_VERSION=$F" >> "$GITHUB_ENV"       # in file names: version of the release, otherwise "dev"
           echo "DISPLAY_VERSION=$D" >> "$GITHUB_ENV"    # shown in the title bar and the About box
           echo "Building version $V"
 
@@ -155,9 +167,10 @@ jobs:
           path: dist-all/*
 
       - name: Attach to release
-        if: github.ref_type == 'tag'
+        if: env.RELEASE_TAG != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             dist/*
             dist-all/*
