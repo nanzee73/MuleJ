@@ -181,6 +181,11 @@ Requires a JDK 17 or newer. IntelliJ IDEA: *File ▸ Open…*, select the folder
 ./gradlew jpackage -PinstallerType=app-image  # portable folder for this system
 ```
 
+## Undo
+
+*Edit ▸ Undo* (Ctrl+Z / ⌘Z) and *Redo* (Ctrl+Y / ⇧⌘Z) for settings, frame, target, starting step and every
+edit in the colour check, up to 100 steps (C64GfxLib `UndoHistory`). Loading a picture starts a new history.
+
 ## User guide
 
 *Help ▸ User guide* (F1) explains every function in English or German.

@@ -1,5 +1,7 @@
 package de.mulej.gui;
 
+import de.c64gfx.swing.UndoHistory;
+
 import de.c64gfx.dither.Dither;
 import de.c64gfx.dither.Ditherer;
 import de.c64gfx.swing.FileDialogs;
@@ -145,6 +147,8 @@ public class MainWindow extends JFrame {
     private BufferedImage source;
     /** Frame & scaling; null = the picture is taken as it is (C64 size). */
     private ImageFitter.Settings fitSettings;
+    /** Undo / redo of settings, frame and colour check edits (not of loading a picture). */
+    private final UndoHistory history = new UndoHistory(this::captureState, this::restoreState);
     private Pipeline.Detection detection;
     /** Entry chosen by hand; null = automatic. */
     private Step manualEntry;
@@ -275,6 +279,7 @@ public class MainWindow extends JFrame {
                 tr("about.title"), JOptionPane.INFORMATION_MESSAGE, aboutIcon()));
         help.add(about);
         bar.add(file);
+        bar.add(history.menu());
         bar.add(language);
         bar.add(help);
         return bar;
@@ -891,6 +896,87 @@ public class MainWindow extends JFrame {
         return Pipeline.entries(target(), source).contains(e) ? e : Step.FRAME;
     }
 
+    // ---------------------------------------------------------------- undo
+
+    /** All settings and edits, keyed by the translation key of their label (shown as "Undo: …"). */
+    private Map<String, Object> captureState() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("top.target", target());
+        m.put("top.entry", Optional.ofNullable(manualEntry));
+        m.put("step.FRAME", Optional.ofNullable(fitSettings));
+        m.put("prep.contrast", contrast.getValue());
+        m.put("prep.brightness", brightness.getValue());
+        m.put("prep.gamma", gamma.getValue());
+        m.put("prep.saturation", saturation.getValue());
+        m.put("step.PIXELIZER", pairR2L.isSelected());
+        m.put("pal.group", paletteBox.getSelectedItem());
+        m.put("pal.matchIn", spaceBox.getSelectedItem());
+        m.put("dit.group", ditherBox.getSelectedItem());
+        m.put("dit.strength", strength.getValue());
+        m.put("dit.serpentine", serpentine.isSelected());
+        m.put("dit.bleeding", bleeding.isSelected());
+        m.put("bmp.background", backgroundBox.getSelectedIndex());
+        m.put("bmp.fix", fixClashes.isSelected());
+        m.put("pet.charset", charsetBox.getSelectedItem());
+        m.put("pet.text", textChars.isSelected());
+        m.put("pet.group", petBackgroundBox.getSelectedIndex());
+        m.put("pet.detail", detail.getValue());
+        m.put("pet.diffusion", diffusion.getValue());
+        m.put("pet.calm", calm.getValue());
+        Map<Integer, List<Integer>> cells = new TreeMap<>();
+        cellEdits.forEach((k, v) -> cells.put(k, Arrays.stream(v).boxed().toList()));
+        m.put("chk.group", List.of(cells, new TreeMap<>(pixelEdits)));
+        return m;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void restoreState(Map<String, Object> m) {
+        loading = true;                                       // set everything, then recompute once
+        try {
+            Target t = (Target) m.get("top.target");
+            if (t != target()) {
+                targetButtons.get(t).setSelected(true);
+                targetChanged();
+            }
+            manualEntry = ((Optional<Step>) m.get("top.entry")).orElse(null);
+            fitSettings = ((Optional<ImageFitter.Settings>) m.get("step.FRAME")).orElse(null);
+            if (source != null)
+                cropEditor.setSource(source, fitSettings != null ? fitSettings : ImageFitter.Settings.suggested(source));
+            contrast.setValue((Integer) m.get("prep.contrast"));
+            brightness.setValue((Integer) m.get("prep.brightness"));
+            gamma.setValue((Integer) m.get("prep.gamma"));
+            saturation.setValue((Integer) m.get("prep.saturation"));
+            ((Boolean) m.get("step.PIXELIZER") ? pairR2L : pairL2R).setSelected(true);
+            paletteBox.setSelectedItem(m.get("pal.group"));
+            spaceBox.setSelectedItem(m.get("pal.matchIn"));
+            ditherBox.setSelectedItem(m.get("dit.group"));
+            strength.setValue((Integer) m.get("dit.strength"));
+            serpentine.setSelected((Boolean) m.get("dit.serpentine"));
+            bleeding.setSelected((Boolean) m.get("dit.bleeding"));
+            backgroundBox.setSelectedIndex((Integer) m.get("bmp.background"));
+            fixClashes.setSelected((Boolean) m.get("bmp.fix"));
+            charsetBox.setSelectedItem(m.get("pet.charset"));
+            textChars.setSelected((Boolean) m.get("pet.text"));
+            petBackgroundBox.setSelectedIndex((Integer) m.get("pet.group"));
+            detail.setValue((Integer) m.get("pet.detail"));
+            diffusion.setValue((Integer) m.get("pet.diffusion"));
+            calm.setValue((Integer) m.get("pet.calm"));
+            List<Object> edits = (List<Object>) m.get("chk.group");
+            cellEdits.clear();
+            ((Map<Integer, List<Integer>>) edits.get(0)).forEach((k, v) ->
+                    cellEdits.put(k, v.stream().mapToInt(Integer::intValue).toArray()));
+            pixelEdits.clear();
+            pixelEdits.putAll((Map<Integer, Integer>) edits.get(1));
+        } finally {
+            loading = false;
+        }
+        updateEntryBox();
+        updateStepBar();
+        showStep(current);
+        dirtyFrom = Step.FRAME;
+        changed(Step.FRAME);
+    }
+
     private Pipeline.Params params() {
         PetsciiConverter.Settings ps = new PetsciiConverter.Settings((Charset) charsetBox.getSelectedItem(),
                 textChars.isSelected(), (Integer) petBackgroundBox.getSelectedItem(), detail.getValue(),
@@ -908,6 +994,7 @@ public class MainWindow extends JFrame {
     /** A setting of a step changed: recompute from that step on (debounced). */
     private void changed(Step from) {
         if (loading || source == null) return;
+        history.changed();
         if (from.ordinal() < dirtyFrom.ordinal()) dirtyFrom = from;
         generation++;
         updateTimer.restart();
@@ -1391,6 +1478,7 @@ public class MainWindow extends JFrame {
         rightPanel.fit();
         dirtyFrom = Step.FRAME;
         changed(Step.FRAME);
+        history.reset();                                      // a new picture starts a new history
     }
 
     /** A C64 file as input is redrawn when the palette changes. */
