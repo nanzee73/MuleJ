@@ -92,8 +92,13 @@ val jpackage by tasks.registering(Exec::class) {
     val type = providers.gradleProperty("installerType").orNull
         ?: when { os.isWindows -> "msi"; os.isMacOsX -> "dmg"; else -> "deb" }
     var appVersion = providers.gradleProperty("appVersion").orNull ?: project.version.toString()
-    // jpackage on macOS refuses versions starting with 0
-    if (os.isMacOsX && appVersion.startsWith("0")) appVersion = "1" + appVersion.substring(1)
+    // macOS installers take only 1-3 numbers and refuse a first 0 (0.7.3.666 -> 1.7.3, only inside the installer)
+    if (os.isMacOsX) {
+        val parts = appVersion.split('.', '-').filter { it.isNotEmpty() && it.all(Char::isDigit) }.take(3).toMutableList()
+        if (parts.isEmpty()) parts.add("1")
+        if (parts[0] == "0") parts[0] = "1"
+        appVersion = parts.joinToString(".")
+    }
     val icon = when {
         os.isWindows -> "packaging/mulej.ico"
         os.isMacOsX -> "build/mulej.icns"            // made by the macosIcon task
