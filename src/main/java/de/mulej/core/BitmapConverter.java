@@ -256,7 +256,7 @@ public final class BitmapConverter {
                 for (int i = 0; i < 16 && found < 0; i++) if (p.rgb(i) == rgb) found = i;
                 if (found < 0)
                     throw new ConversionException(String.format(
-                            "Image color #%06X at %d,%d is not in the %s palette.", rgb, x * mode.pixelWidth(), y, p.name()));
+                            "Image colour #%06X at %d,%d is not in the %s palette.", rgb, x * mode.pixelWidth(), y, p.name()));
                 idx[y * w + x] = found;
             }
         }

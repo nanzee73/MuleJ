@@ -1,22 +1,23 @@
 <html><body>
 <h1>MuleJ – User guide</h1>
-<p>MuleJ turns any picture into C64 graphics: a <b>multicolor</b> picture (Koala Painter), a <b>hires</b> picture
+<p>MuleJ turns any picture into C64 graphics: a <b>multicolour</b> picture (Koala Painter), a <b>hires</b> picture
 (Art Studio) or a <b>PETSCII</b> text screen (Petmate) – each also as a runnable C64 program. It checks that every
-cell keeps the C64 color rules and can fix the cells that don't. Everything also works on the command line.</p>
+cell keeps the C64 colour rules and can fix the cells that don't. Everything also works on the command line.</p>
 
 <p><b>Contents</b></p>
 <ul>
 <li><a href="#quick">Quick start</a></li>
-<li><a href="#targets">Targets: multicolor, hires, PETSCII</a></li>
+<li><a href="#targets">Targets: multicolour, hires, PETSCII</a></li>
 <li><a href="#chain">The chain of steps</a></li>
 <li><a href="#input">Opening pictures and "Start at"</a></li>
 <li><a href="#frame">Step 2: Frame</a></li>
 <li><a href="#prepare">Step 3: Prepare</a></li>
-<li><a href="#pixel">Step 4: Pixelizer</a></li>
+<li><a href="#pixel">Step 4: Pixeliser</a></li>
 <li><a href="#colours">Step 5: Colours</a></li>
 <li><a href="#petscii">PETSCII settings</a></li>
 <li><a href="#result">Step 6: Result – colour check, correction, editing</a></li>
 <li><a href="#save">Saving</a></li>
+<li><a href="#projects">Projects</a></li>
 <li><a href="#preview">Previews, zoom and pan</a></li>
 <li><a href="#cli">Command line</a></li>
 <li><a href="#tips">Tips</a></li>
@@ -24,7 +25,7 @@ cell keeps the C64 color rules and can fix the cells that don't. Everything also
 
 <a name="quick"></a><h2>Quick start</h2>
 <ol>
-<li>Choose the <b>Target</b> at the top: Multicolor, Hires or PETSCII.</li>
+<li>Choose the <b>Target</b> at the top: Multicolour, Hires or PETSCII.</li>
 <li><b>Open picture…</b> or drop a file onto the window. MuleJ looks at the picture and decides where to start
 (see <a href="#input">Start at</a>).</li>
 <li>Go through the steps with <b>Next ▶</b> and <b>◀ Back</b>, or click a step in the bar at the top.
@@ -36,7 +37,7 @@ and/or a runnable <b>PRG</b>.</li>
 <a name="targets"></a><h2>Targets</h2>
 <table border="1" cellspacing="0">
 <tr><th>Target</th><th>Picture</th><th>Rules</th><th>File</th></tr>
-<tr><td>Multicolor</td><td>160×200, double-wide pixels</td><td>per 4×8 cell 3 colours plus one background colour shared by the whole picture</td><td>Koala Painter (.kla)</td></tr>
+<tr><td>Multicolour</td><td>160×200, double-wide pixels</td><td>per 4×8 cell 3 colours plus one background colour shared by the whole picture</td><td>Koala Painter (.kla)</td></tr>
 <tr><td>Hires</td><td>320×200</td><td>per 8×8 cell 2 colours</td><td>Art Studio (.art)</td></tr>
 <tr><td>PETSCII</td><td>40×25 characters</td><td>per 8×8 cell one character in one colour plus one shared background colour</td><td>Petmate workspace (.petmate)</td></tr>
 </table>
@@ -44,7 +45,7 @@ and/or a runnable <b>PRG</b>.</li>
 <a name="chain"></a><h2>The chain of steps</h2>
 <p>The two previews show the input and the output of the current step; the settings of the step sit below them.
 Drag the divider between previews and settings to change the sizes – it is set to fit whenever you change the step.</p>
-<p><b>1 Original</b> → <b>2 Frame</b> → <b>3 Prepare</b> → <b>4 Pixelizer</b> (multicolor only) → <b>5 Colours</b>
+<p><b>1 Original</b> → <b>2 Frame</b> → <b>3 Prepare</b> → <b>4 Pixeliser</b> (multicolour only) → <b>5 Colours</b>
 → <b>6 Result</b>. Each step works on the output of the step before. Change something in an early step and all later
 steps update automatically. A step that is "skipped" passes the picture through unchanged; <b>Use this step</b>
 switches it on again.</p>
@@ -53,12 +54,12 @@ switches it on again.</p>
 <p>MuleJ reads every common PC format (PNG, JPEG, GIF, BMP, WebP, TIFF, …) and C64 pictures: Koala, Art Studio,
 Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph, AFLI, Gunpaint, Funpaint, NUFLI, MUFLI, MUIFLI and FlipperJ's raw
 files. C64 pictures are drawn with the selected palette; Art Studio, AFLI, NUFLI, MUFLI and MUIFLI switch the target to
-Hires, the others to Multicolor.</p>
+Hires, the others to Multicolour.</p>
 <p><b>Start at</b> decides which steps the picture still needs. <i>Automatic</i> looks at the picture:</p>
 <ul>
 <li>not 320×200 → start at <i>Frame</i>;</li>
 <li>320×200 with free colours → start at <i>Prepare</i>;</li>
-<li>C64 colours but pixel pairs differ (multicolor) → start at <i>Pixelizer</i>;</li>
+<li>C64 colours but pixel pairs differ (multicolour) → start at <i>Pixeliser</i>;</li>
 <li>C64 size and C64 colours → start at the colour check (<i>Result</i>), nothing is changed.</li>
 </ul>
 <p>Choose a step by hand if your picture was already prepared or edited elsewhere. All steps before it are passed through
@@ -72,7 +73,7 @@ to draw a new one; mouse wheel = zoom, right or middle drag = pan, double click 
 <li><b>Scaling:</b> Stretch, Fit (with borders, see <b>Border colour…</b>), Fill (crop) or 1:1.
 <b>320×200 frame (1:1)</b> takes exactly 320×200 pixels without scaling – a click moves the frame there.</li>
 <li><b>Filter:</b> Area average (smooth) for photos, Nearest neighbour for pixel art.</li>
-<li><b>Whole picture</b> and <b>Max. centered frame</b> are shortcuts; X, Y, Width and Height set the frame exactly.</li>
+<li><b>Whole picture</b> and <b>Max. centred frame</b> are shortcuts; X, Y, Width and Height set the frame exactly.</li>
 </ul>
 
 <a name="prepare"></a><h2>Step 3: Prepare</h2>
@@ -80,8 +81,8 @@ to draw a new one; mouse wheel = zoom, right or middle drag = pan, double click 
 <b>Saturation %</b> (0 = grey). The C64 has few dark and few saturated colours, so a little more contrast and saturation
 often helps.</p>
 
-<a name="pixel"></a><h2>Step 4: Pixelizer (multicolor only)</h2>
-<p>Multicolor pixels are twice as wide, so every pair of pixels becomes one. Which pixel survives decides how thin lines
+<a name="pixel"></a><h2>Step 4: Pixeliser (multicolour only)</h2>
+<p>Multicolour pixels are twice as wide, so every pair of pixels becomes one. Which pixel survives decides how thin lines
 look:</p>
 <ul>
 <li><b>Left → right:</b> the left pixel of every pair is kept.</li>
@@ -99,7 +100,7 @@ palette editor: change colours, load .vpl/.gpl/hex files, save as .vpl.</li>
 patterns. <b>Strength</b> sets how much; <b>Serpentine scanning</b> avoids diagonal patterns.</li>
 <li><b>Bleeding (across cells):</b> the dither error may continue into neighbouring cells – smoother, but cell edges are
 less clean.</li>
-<li><b>Background:</b> automatic (best colour) or fixed (multicolor and PETSCII).</li>
+<li><b>Background:</b> automatic (best colour) or fixed (multicolour and PETSCII).</li>
 <li><b>Correct automatically:</b> cells with too many colours get the colours that reproduce them best. With dithering
 the result always keeps the rules.</li>
 </ul>
@@ -123,7 +124,7 @@ eye sees it.</p>
 the rules, yellow = corrected, cyan = selected cell (only in the preview, never in files).</li>
 <li><b>Click into result:</b> <i>Select cell</i> – a left click selects a cell and shows its colours with the number of
 pixels; <i>Paint</i> – a left click or drag sets pixels to the chosen colour.</li>
-<li>For a selected cell: press up to the allowed number of colours (BG = background, always allowed in multicolor) and
+<li>For a selected cell: press up to the allowed number of colours (BG = background, always allowed in multicolour) and
 <b>Apply colours</b> – every pixel gets the nearest of them. <b>Automatic</b> chooses the best colours for this cell,
 <b>Reset cell</b> discards your colours and painted pixels, <b>Discard all</b> does so for every cell (after asking).</li>
 <li><b>Fix all</b> gives every cell with too many colours the colours that reproduce it best – like <i>Automatic</i> for
@@ -141,6 +142,17 @@ it again later (choose that step in "Start at"). The enlargement factor next to 
 the picture exactly again when loading.</li>
 <li>MuleJ asks before overwriting a file, and warns in particular before overwriting the picture you opened.</li>
 </ul>
+
+<a name="projects"></a><h2>Projects</h2>
+<p>A <b>project</b> keeps a picture together with all settings and edits, so you can carry on later.
+<b>File ▸ Save project</b> (Ctrl+S, on macOS ⌘S) creates a folder named after the picture in <i>Projects</i> – next to
+the program if that folder can be written to, otherwise in <i>Documents/MuleJ</i>. Inside are the project file
+(<i>name.mulej</i>), <i>import/</i> with a copy of the picture and <i>export/</i> with all results, written anew on every
+save. If a folder with that name already exists, “name (2)” is used.</p>
+<p>The File menu also has <b>New</b> (Ctrl+N), <b>Open picture</b> (Ctrl+O), <b>Open project</b> (Ctrl+Shift+O),
+<b>Open recent</b> (the last 10 projects), <b>Save as</b> (Ctrl+Shift+S), <b>Close project</b> (Ctrl+W) and <b>Open
+project folder</b>. While there are unsaved changes the title shows a “•”; before they would be lost (closing, quitting,
+opening another picture or project) the program asks whether to save.</p>
 
 <a name="preview"></a><h2>Previews, zoom and pan</h2>
 <ul>
@@ -163,8 +175,8 @@ slider or painting a stroke counts as one step. Loading a new picture starts a n
 <table border="1" cellspacing="0">
 <tr><th>Command</th><th>Does</th></tr>
 <tr><td><code>palettize</code></td><td>maps all colours to the nearest palette colour → NAME_palettized.png</td></tr>
-<tr><td><code>pixelize</code></td><td>makes 2×1 multicolor pixels → NAME_pixelized_l2r.png / _r2l.png</td></tr>
-<tr><td><code>koala</code></td><td>multicolor bitmap → NAME.kla</td></tr>
+<tr><td><code>pixelize</code></td><td>makes 2×1 multicolour pixels → NAME_pixelized_l2r.png / _r2l.png</td></tr>
+<tr><td><code>koala</code></td><td>multicolour bitmap → NAME.kla</td></tr>
 <tr><td><code>hires</code></td><td>hires bitmap → NAME.art</td></tr>
 <tr><td><code>petscii</code></td><td>text screen → NAME.petmate</td></tr>
 <tr><td><code>check</code></td><td>lists the cells that break the rules of <code>--mode mc|hires</code></td></tr>
@@ -181,7 +193,7 @@ c64koalaverter still works.</p>
 <a name="tips"></a><h2>Tips</h2>
 <ul>
 <li>Pixel art drawn for the C64: start at the colour check, use no dithering and fix single cells by hand.</li>
-<li>Photos: Average in the pixelizer, a little more contrast, Floyd-Steinberg or Atkinson dithering.</li>
+<li>Photos: Average in the pixeliser, a little more contrast, Floyd-Steinberg or Atkinson dithering.</li>
 <li>Too many conflicts: switch on <i>Correct automatically</i> or try a fixed background colour.</li>
 </ul>
 <p>Feedback and bug reports are welcome on GitHub: <a href="https://github.com/nanzee73/MuleJ">github.com/nanzee73/MuleJ</a></p>

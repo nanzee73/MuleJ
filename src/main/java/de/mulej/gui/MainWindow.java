@@ -1,6 +1,10 @@
 package de.mulej.gui;
 
 import de.c64gfx.swing.UndoHistory;
+import de.c64gfx.swing.ProjectFile;
+import de.c64gfx.swing.ProjectFolders;
+import de.c64gfx.swing.ProjectSession;
+import de.c64gfx.swing.Platform;
 
 import de.c64gfx.dither.Dither;
 import de.c64gfx.dither.Ditherer;
@@ -149,6 +153,12 @@ public class MainWindow extends JFrame {
     private ImageFitter.Settings fitSettings;
     /** Undo / redo of settings, frame and colour check edits (not of loading a picture). */
     private final UndoHistory history = new UndoHistory(this::captureState, this::restoreState);
+    /** The project: File menu, saving, unsaved marker and question. */
+    private final ProjectSession session;
+    /** Results still to be written to the project's Export folder once the chain is computed. */
+    private File pendingExport;
+    /** Settings of a fresh start, for File ▸ New. */
+    private Map<String, Object> defaults;
     private Pipeline.Detection detection;
     /** Entry chosen by hand; null = automatic. */
     private Step manualEntry;
@@ -165,8 +175,10 @@ public class MainWindow extends JFrame {
     private final List<Component> needPicture = new ArrayList<>();
 
     public MainWindow() {
-        I18n.bind(() -> setTitle(tr("app.title", App.VERSION)));
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        session = new ProjectSession(this, "mulej", history, new ProjectHandler());
+        session.setStatus(msg -> { statusText = () -> msg; status.setText(msg); });
+        session.addListener(this::updateTitle);
+        I18n.bind(this::updateTitle);
         setIconImages(Icons.appIcons());
         for (Palette p : Palettes.builtIns()) paletteModel.addElement(p);
         paletteBox.setSelectedItem(Palettes.COLODORE);
@@ -211,6 +223,7 @@ public class MainWindow extends JFrame {
         root.add(center, BorderLayout.CENTER);
         root.add(buildBottom(), BorderLayout.SOUTH);
         setContentPane(root);
+        defaults = captureState();
         installDragAndDrop(root);
         wireListeners();
 
@@ -234,14 +247,9 @@ public class MainWindow extends JFrame {
 
     private JMenuBar buildMenu() {
         JMenuBar bar = new JMenuBar();
-        JMenu file = I18n.text(new JMenu(), "menu.file");
         JMenuItem open = I18n.text(new JMenuItem(), "menu.file.open");
         open.addActionListener(e -> chooseInput());
-        JMenuItem exit = I18n.text(new JMenuItem(), "menu.file.exit");
-        exit.addActionListener(e -> dispose());
-        file.add(open);
-        file.addSeparator();
-        file.add(exit);
+        JMenu file = session.fileMenu(open, List.of(), null);
 
         JMenu language = I18n.text(new JMenu(), "menu.language");
         ButtonGroup lg = new ButtonGroup();
@@ -274,10 +282,11 @@ public class MainWindow extends JFrame {
                 App.NAME + " – " + tr("menu.help.guide"), "/de/mulej/help/help"));
         help.add(guide);
         help.addSeparator();
-        JMenuItem about = I18n.text(new JMenuItem(), "menu.help.about");
-        about.addActionListener(e -> JOptionPane.showMessageDialog(this, tr("about.text", App.VERSION),
-                tr("about.title"), JOptionPane.INFORMATION_MESSAGE, aboutIcon()));
-        help.add(about);
+        if (!Platform.IS_MAC) {                 // on macOS "About" sits in the application menu (see App)
+            JMenuItem about = I18n.text(new JMenuItem(), "menu.help.about");
+            about.addActionListener(e -> showAbout());
+            help.add(about);
+        }
         bar.add(file);
         bar.add(history.menu());
         bar.add(language);
@@ -896,6 +905,219 @@ public class MainWindow extends JFrame {
         return Pipeline.entries(target(), source).contains(e) ? e : Step.FRAME;
     }
 
+    // ---------------------------------------------------------------- project
+
+    private void updateTitle() {
+        setTitle(tr("app.title", App.VERSION) + (session != null ? session.titleSuffix() : ""));
+    }
+
+    public void showAbout() {
+        JOptionPane.showMessageDialog(this, tr("about.text", App.VERSION), tr("about.title"),
+                JOptionPane.INFORMATION_MESSAGE, aboutIcon());
+    }
+
+    /** macOS "Quit" (⌘Q): asks about unsaved changes; false keeps the program running. */
+    public boolean requestQuit() {
+        if (!session.confirmDiscard()) return false;
+        dispose();
+        return true;
+    }
+
+    /** Writes the C64 file, the PRG and the PNG of the result to the Export folder, once the chain is computed. */
+    private void exportProject(File exportDir) {
+        pendingExport = exportDir;
+        boolean busy = updateTimer.isRunning() || (worker != null && !worker.isDone());
+        if (!busy && outputs != null) writePendingExport();
+    }
+
+    private void writePendingExport() {
+        File dir = pendingExport;
+        Pipeline.Outputs o = outputs;
+        if (dir == null || o == null) return;
+        pendingExport = null;
+        try {
+            dir.mkdirs();
+            String base = dir.getParentFile().getName();
+            if (o.colours() != null) Images.writePng(o.colours(), new File(dir, base + ".png").toPath());
+            if (o.ok()) {
+                if (o.petscii() != null) {
+                    Files.writeString(new File(dir, base + ".petmate").toPath(), o.petscii().toPetmate(base),
+                            StandardCharsets.UTF_8);
+                    Files.write(new File(dir, base + ".prg").toPath(), ViewerPrg.petscii(o.petscii()));
+                } else if (o.bitmap() != null) {
+                    Files.write(new File(dir, base + "." + o.bitmap().mode().extension).toPath(), o.bitmap().fileBytes());
+                    Files.write(new File(dir, base + ".prg").toPath(), ViewerPrg.build(o.bitmap()));
+                }
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, tr("err.write", ex.getMessage()), App.NAME, JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Project files: settings and edits as text, picture copied to Import/, results in Export/. */
+    private final class ProjectHandler implements ProjectSession.Handler {
+        @Override public boolean hasPicture() { return source != null; }
+
+        @Override public String pictureName() { return inputFile != null ? inputFile.getName() : "picture"; }
+
+        @Override public void write(ProjectFile p, File dir) throws java.io.IOException {
+            File imp = ProjectFolders.importDir(dir);
+            imp.mkdirs();
+            File copy = new File(imp, inputFile.getName());
+            if (!inputFile.getAbsoluteFile().equals(copy.getAbsoluteFile()))
+                Files.copy(inputFile.toPath(), copy.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            p.put("picture", imp.getName() + "/" + inputFile.getName());
+            history.commit();
+            for (Map.Entry<String, Object> e : captureState().entrySet()) {
+                if (e.getKey().equals("chk.group")) {
+                    p.put("chk.cells", encodeCells());
+                    p.put("chk.pixels", encodePixels());
+                } else p.put(e.getKey(), encode(e.getValue()));
+            }
+            inputFile = copy;                                 // the project uses its own copy from now on
+            exportProject(ProjectFolders.exportDir(dir));
+        }
+
+        @Override public void read(ProjectFile p, File dir) throws java.io.IOException {
+            String pic = p.get("picture", null);
+            File f = pic == null ? null : new File(dir, pic);
+            if (f == null || !f.isFile()) throw new java.io.IOException(tr("project.error.picture", f == null ? "?" : f.getPath()));
+            Map<String, Object> m = decode(p);
+            paletteBox.setSelectedItem(m.get("pal.group"));        // C64 pictures are drawn with it
+            if (!loadPicture(f)) throw new java.io.IOException(f.getPath());
+            restoreState(m);
+        }
+
+        @Override public void clear() {
+            if (worker != null) worker.cancel(false);
+            updateTimer.stop();
+            pendingExport = null;
+            restoreState(defaults);
+            loading = true;
+            source = null;
+            inputFile = null;
+            outputs = null;
+            outputParams = null;
+            fitSettings = null;
+            cellEdits.clear();
+            pixelEdits.clear();
+            selectedCell = -1;
+            loading = false;
+            fileLabel.setText(" ");
+            leftPanel.setImage(null);
+            rightPanel.setImage(null);
+            updateEntryBox();
+            updateStepBar();
+            updateOriginalInfo();
+            showStep(Step.ORIGINAL);
+            updateEnabled();
+            setStatus("status.new");
+        }
+    }
+
+    /** A setting as text for the project file. */
+    private static String encode(Object v) {
+        if (v instanceof Optional<?> o) return o.map(MainWindow::encode).orElse("");
+        if (v instanceof Palette p) {
+            StringBuilder sb = new StringBuilder(p.name()).append('|');
+            for (int i = 0; i < 16; i++) sb.append(i > 0 ? "," : "").append(String.format("%06X", p.rgb(i)));
+            return sb.toString();
+        }
+        if (v instanceof ImageFitter.Settings f) {
+            Rectangle c = f.crop();
+            return (c == null ? "" : c.x + "," + c.y + "," + c.width + "," + c.height) + ";" + f.mode().name() + ";"
+                    + f.filter().name() + ";" + f.aspect().name() + ";" + String.format("%06X", f.fill().getRGB() & 0xFFFFFF);
+        }
+        return v instanceof Enum<?> e ? e.name() : String.valueOf(v);
+    }
+
+    /** "cell:c,c,c;cell:c,c" – the colours chosen by hand per cell. */
+    private String encodeCells() {
+        StringBuilder sb = new StringBuilder();
+        new TreeMap<>(cellEdits).forEach((k, v) -> {
+            if (sb.length() > 0) sb.append(';');
+            sb.append(k).append(':');
+            for (int i = 0; i < v.length; i++) sb.append(i > 0 ? "," : "").append(v[i]);
+        });
+        return sb.toString();
+    }
+
+    /** "pixel:colour;…" – painted pixels. */
+    private String encodePixels() {
+        StringBuilder sb = new StringBuilder();
+        new TreeMap<>(pixelEdits).forEach((k, v) -> sb.append(sb.length() > 0 ? ";" : "").append(k).append(':').append(v));
+        return sb.toString();
+    }
+
+    /** Settings and edits from a project file; missing or broken entries keep the current value. */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> decode(ProjectFile p) {
+        Map<String, Object> m = captureState();
+        for (Map.Entry<String, Object> e : m.entrySet()) {
+            String k = e.getKey();
+            Object cur = e.getValue();
+            try {
+                if (k.equals("chk.group")) {
+                    Map<Integer, List<Integer>> cells = new TreeMap<>();
+                    for (String part : p.get("chk.cells", "").split(";")) {
+                        if (part.isBlank()) continue;
+                        String[] kv = part.split(":");
+                        List<Integer> cs = new java.util.ArrayList<>();
+                        for (String c : kv[1].split(",")) if (!c.isBlank()) cs.add(Integer.parseInt(c.trim()));
+                        cells.put(Integer.parseInt(kv[0].trim()), List.copyOf(cs));
+                    }
+                    Map<Integer, Integer> pixels = new TreeMap<>();
+                    for (String part : p.get("chk.pixels", "").split(";")) {
+                        if (part.isBlank()) continue;
+                        String[] kv = part.split(":");
+                        pixels.put(Integer.parseInt(kv[0].trim()), Integer.parseInt(kv[1].trim()));
+                    }
+                    e.setValue(List.of(cells, pixels));
+                    continue;
+                }
+                if (!p.has(k)) continue;
+                String t = p.get(k, "");
+                if (k.equals("top.entry")) e.setValue(t.isBlank() ? Optional.empty() : Optional.of(Step.valueOf(t.trim())));
+                else if (k.equals("step.FRAME")) e.setValue(t.isBlank() ? Optional.empty() : Optional.of(frame(t)));
+                else if (cur instanceof Integer) e.setValue(p.getInt(k, (Integer) cur));
+                else if (cur instanceof Boolean) e.setValue(p.getBool(k, (Boolean) cur));
+                else if (cur instanceof Enum<?> en) e.setValue(Enum.valueOf(en.getDeclaringClass(), t.trim()));
+                else if (cur instanceof Palette) e.setValue(palette(t));
+                else e.setValue(t);
+            } catch (RuntimeException ignored) {
+                // keep the current value
+            }
+        }
+        return m;
+    }
+
+    /** Palette from "name|RRGGBB,…": a known one with the same colours, otherwise added to the list. */
+    private Palette palette(String t) {
+        String[] parts = t.split("\\|", 2);
+        String[] hex = parts[1].split(",");
+        int[] rgb = new int[16];
+        for (int i = 0; i < 16; i++) rgb[i] = Integer.parseInt(hex[i].trim(), 16);
+        for (int i = 0; i < paletteModel.getSize(); i++) {
+            Palette p = paletteModel.getElementAt(i);
+            if (p.name().equals(parts[0]) && Arrays.equals(p.toArray(), rgb)) return p;
+        }
+        Palette p = new Palette(parts[0], rgb);
+        paletteModel.addElement(p);
+        return p;
+    }
+
+    private static ImageFitter.Settings frame(String t) {
+        String[] f = t.split(";", -1);
+        Rectangle crop = null;
+        if (!f[0].isBlank()) {
+            String[] c = f[0].split(",");
+            crop = new Rectangle(Integer.parseInt(c[0].trim()), Integer.parseInt(c[1].trim()),
+                    Integer.parseInt(c[2].trim()), Integer.parseInt(c[3].trim()));
+        }
+        return new ImageFitter.Settings(crop, ImageFitter.ScaleMode.valueOf(f[1]), ImageFitter.Filter.valueOf(f[2]),
+                ImageFitter.Aspect.valueOf(f[3]), new Color(Integer.parseInt(f[4], 16)));
+    }
+
     // ---------------------------------------------------------------- undo
 
     /** All settings and edits, keyed by the translation key of their label (shown as "Undo: …"). */
@@ -1090,6 +1312,7 @@ public class MainWindow extends JFrame {
                     updateViews();
                     updateEnabled();
                     updateCellPanel();
+                    if (pendingExport != null) writePendingExport();
                 } catch (Exception ex) {
                     progress.setVisible(false);
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
@@ -1442,14 +1665,20 @@ public class MainWindow extends JFrame {
         if (f != null) loadInput(f);
     }
 
-    /** Loads a picture, finds out where the chain starts and shows that step. */
+    /** Opens a picture chosen by the user: asks about unsaved changes, starts a new project. */
     void loadInput(File f) {
+        if (!session.confirmDiscard()) return;
+        if (loadPicture(f)) session.pictureLoaded();
+    }
+
+    /** Loads a picture, finds out where the chain starts and shows that step; false if it cannot be read. */
+    private boolean loadPicture(File f) {
         BufferedImage img;
         try {
             img = Images.read(f.toPath(), palette());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, tr("err.read", ex.getMessage()), App.NAME, JOptionPane.ERROR_MESSAGE);
-            return;
+            return false;
         }
         FileDialogs.rememberDir("input", f);
         loading = true;
@@ -1479,6 +1708,7 @@ public class MainWindow extends JFrame {
         dirtyFrom = Step.FRAME;
         changed(Step.FRAME);
         history.reset();                                      // a new picture starts a new history
+        return true;
     }
 
     /** A C64 file as input is redrawn when the palette changes. */

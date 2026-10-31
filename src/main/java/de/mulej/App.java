@@ -32,6 +32,7 @@ public final class App {
         if (args.length > 0) {
             System.exit(Cli.run(args));
         }
+        de.c64gfx.swing.Platform.initBeforeAwt(NAME);
         de.c64gfx.swing.I18n.init();
         SwingUtilities.invokeLater(() -> {
             try {
@@ -42,7 +43,24 @@ public final class App {
             // GTK (Linux) draws the slider value above the thumb, where it gets cut off
             UIManager.put("Slider.paintValue", Boolean.FALSE);
             de.c64gfx.swing.Icons.installTaskbarIcon();
-            new MainWindow().setVisible(true);
+            MainWindow w = new MainWindow();
+            installDesktopHandlers(w);
+            w.setVisible(true);
         });
+    }
+
+    /** macOS application menu: About and Quit (⌘Q) call into the app, like in FlipperJ. */
+    private static void installDesktopHandlers(MainWindow w) {
+        if (!java.awt.Desktop.isDesktopSupported()) return;
+        java.awt.Desktop d = java.awt.Desktop.getDesktop();
+        try {
+            if (d.isSupported(java.awt.Desktop.Action.APP_ABOUT)) d.setAboutHandler(e -> w.showAbout());
+            if (d.isSupported(java.awt.Desktop.Action.APP_QUIT_HANDLER)) d.setQuitHandler((e, r) -> {
+                if (w.requestQuit()) r.performQuit();       // asks about an unsaved project first
+                else r.cancelQuit();
+            });
+        } catch (Exception ignored) {
+            // not supported on this platform
+        }
     }
 }
