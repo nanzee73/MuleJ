@@ -24,7 +24,7 @@ public final class App {
     /** Tells C64GfxLib the app name, settings node, icons and texts. Call before anything else. */
     public static void configure() {
         AppConfig.install(new AppConfig(NAME, "de/mulej", "/de/mulej/icons/mulej-",
-                "de.mulej.i18n.messages", List.of(Locale.ENGLISH, Locale.GERMAN), false));
+                "de.mulej.i18n.messages", List.of(Locale.ENGLISH, Locale.GERMAN), true));   // follows the system language until one is chosen
     }
 
     public static void main(String[] args) {

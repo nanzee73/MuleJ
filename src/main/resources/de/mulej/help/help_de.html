@@ -43,6 +43,9 @@ und/oder eine startbare <b>PRG</b> speichern.</li>
 </table>
 
 <a name="chain"></a><h2>Die Kette der Schritte</h2>
+<p>Die beiden Vorschauen zeigen Eingabe und Ausgabe des aktuellen Schritts, darunter stehen die Einstellungen des
+Schritts. Mit dem Trennbalken zwischen Vorschauen und Einstellungen änderst du die Größen – beim Schrittwechsel wird er
+passend gesetzt.</p>
 <p><b>1 Original</b> → <b>2 Ausschnitt</b> → <b>3 Vorbereiten</b> → <b>4 Pixelizer</b> (nur Multicolor) →
 <b>5 Farben</b> → <b>6 Ergebnis</b>. Jeder Schritt arbeitet mit der Ausgabe des vorigen. Änderst du etwas in einem
 frühen Schritt, aktualisieren sich alle späteren automatisch. Ein „übersprungener“ Schritt reicht das Bild unverändert
@@ -50,8 +53,9 @@ durch; <b>Diesen Schritt ausführen</b> schaltet ihn wieder ein.</p>
 
 <a name="input"></a><h2>Bilder öffnen und „Weiter ab“</h2>
 <p>MuleJ liest alle üblichen PC-Formate (PNG, JPEG, GIF, BMP, WebP, TIFF, …) und C64-Bilder: Koala, Art Studio,
-Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph, AFLI, Gunpaint, Funpaint und FlipperJs Rohdateien. C64-Bilder
-werden mit der gewählten Palette gezeichnet; Art Studio und AFLI stellen das Ziel auf Hires, die anderen auf Multicolor.</p>
+Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph, AFLI, Gunpaint, Funpaint, NUFLI, MUFLI, MUIFLI und FlipperJs
+Rohdateien. C64-Bilder werden mit der gewählten Palette gezeichnet; Art Studio, AFLI, NUFLI, MUFLI und MUIFLI stellen
+das Ziel auf Hires, die anderen auf Multicolor.</p>
 <p><b>Weiter ab</b> legt fest, welche Schritte das Bild noch braucht. <i>Automatisch</i> schaut sich das Bild an:</p>
 <ul>
 <li>nicht 320×200 → Start bei <i>Ausschnitt</i>;</li>
@@ -127,7 +131,10 @@ der Pixel; <i>Malen</i> – Linksklick oder Ziehen setzt Pixel auf die gewählte
 <li>Für eine gewählte Zelle: bis zur erlaubten Zahl Farben drücken (BG = Hintergrund, bei Multicolor immer erlaubt) und
 <b>Farben übernehmen</b> – jeder Pixel bekommt die nächstliegende davon. <b>Automatisch</b> wählt die besten Farben für
 diese Zelle, <b>Zelle zurücksetzen</b> verwirft deine Farben und gemalten Pixel, <b>Alle verwerfen</b> tut das für alle
-Zellen.</li>
+Zellen (nach einer Rückfrage).</li>
+<li><b>Alle korrigieren</b> gibt jeder Zelle mit zu vielen Farben die Farben, die sie am besten wiedergeben – wie
+<i>Automatisch</i>, aber für alle Konfliktzellen auf einmal. Danach lässt sich jede Zelle weiter von Hand ändern oder
+zurücksetzen.</li>
 </ul>
 
 <a name="save"></a><h2>Speichern</h2>
@@ -150,7 +157,8 @@ erleichtert das Bearbeiten; MuleJ verkleinert das Bild beim Laden wieder exakt.<
 8×8-Zellenlinien, <b>PAL</b> zeigt 320×200-Bilder im Seitenverhältnis eines PAL-Monitors.</li>
 <li>Jede Gruppe hat eine Schaltfläche <b>Standard</b>. Regler: Pfeile verstellen um 1, die Markierung zeigt den
 Standardwert, Doppelklick setzt zurück.</li>
-<li>Sprache: Menü <b>Sprache</b> (Englisch oder Deutsch).</li>
+<li>Sprache: Menü <b>Sprache</b>. <i>Systemsprache</i> (Standard) folgt deinem Rechner – Englisch, wenn der weder
+Deutsch noch Englisch spricht; eine von Hand gewählte Sprache bleibt beim nächsten Start erhalten.</li>
 </ul>
 
 <a name="cli"></a><h2>Kommandozeile</h2>

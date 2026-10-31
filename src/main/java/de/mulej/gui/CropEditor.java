@@ -38,30 +38,41 @@ public class CropEditor {
     public CropEditor() {
         I18n.tip(view, "crop.help");
         view.setBackground(new Color(0x30, 0x30, 0x30));
-        GridBagConstraints c = new GridBagConstraints();
-        c.gridx = 0; c.gridy = 0; c.anchor = GridBagConstraints.WEST; c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(2, 3, 2, 3); c.gridwidth = 2; c.weightx = 1;
-        controls.add(I18n.label("crop.aspect"), c); c.gridy++;
-        controls.add(aspectBox, c); c.gridy++;
-        controls.add(I18n.label("crop.mode"), c); c.gridy++;
-        controls.add(modeBox, c); c.gridy++;
-        controls.add(I18n.label("crop.filter"), c); c.gridy++;
-        controls.add(filterBox, c); c.gridy++;
-        controls.add(fillButton, c); c.gridy++;
-        controls.add(lockAspect, c); c.gridy++;
+        // three columns (the settings sit below the wide previews): scaling | frame position | shortcuts
+        JPanel scaling = column(), position = column(), shortcuts = column();
+        GridBagConstraints c = cell(0);
+        scaling.add(I18n.label("crop.aspect"), c); c.gridy++;
+        scaling.add(aspectBox, c); c.gridy++;
+        scaling.add(I18n.label("crop.mode"), c); c.gridy++;
+        scaling.add(modeBox, c); c.gridy++;
+        scaling.add(I18n.label("crop.filter"), c); c.gridy++;
+        scaling.add(filterBox, c);
+
+        c = cell(0);
+        c.gridwidth = 2;
+        position.add(lockAspect, c); c.gridy++;
         c.gridwidth = 1;
-        addSpinner(c, "crop.x", sx); addSpinner(c, "crop.y", sy);
-        addSpinner(c, "crop.width", sw); addSpinner(c, "crop.height", sh);
-        c.gridx = 0; c.gridwidth = 2;
+        addSpinner(position, c, "crop.x", sx); addSpinner(position, c, "crop.y", sy);
+        addSpinner(position, c, "crop.width", sw); addSpinner(position, c, "crop.height", sh);
+
         JButton whole = I18n.text(new JButton(), "crop.whole");
         JButton center = I18n.text(new JButton(), "crop.center");
         JButton oneToOne = I18n.tip(I18n.text(new JButton(), "crop.oneToOne"), "crop.oneToOne.tip");
-        controls.add(whole, c); c.gridy++;
-        controls.add(center, c); c.gridy++;
-        controls.add(oneToOne, c); c.gridy++;
+        c = cell(0);
+        shortcuts.add(whole, c); c.gridy++;
+        shortcuts.add(center, c); c.gridy++;
+        shortcuts.add(oneToOne, c); c.gridy++;
+        shortcuts.add(fillButton, c);
+
+        c = cell(0);
+        c.anchor = GridBagConstraints.NORTHWEST;
+        c.weightx = 1; controls.add(scaling, c);
+        c.gridx = 1; controls.add(position, c);
+        c.gridx = 2; c.weightx = 0.6; controls.add(shortcuts, c);
         JLabel help = new JLabel();
-        I18n.bind(() -> help.setText(MainWindow.wrapped("<small>" + tr("crop.help") + "</small>")));
-        controls.add(help, c); c.gridy++;
+        I18n.bind(() -> help.setText("<html><small>" + tr("crop.help") + "</small></html>"));
+        c.gridx = 0; c.gridy = 1; c.gridwidth = 3; c.weightx = 1;
+        controls.add(help, c);
 
         whole.addActionListener(e -> {
             if (source == null) return;
@@ -109,10 +120,19 @@ public class CropEditor {
         view.repaint();
     }
 
-    private void addSpinner(GridBagConstraints c, String key, JSpinner s) {
-        c.gridx = 0; c.weightx = 0; controls.add(I18n.label(key), c);
-        c.gridx = 1; c.weightx = 1; controls.add(s, c);
+    private static void addSpinner(JPanel p, GridBagConstraints c, String key, JSpinner s) {
+        c.gridx = 0; c.weightx = 0; p.add(I18n.label(key), c);
+        c.gridx = 1; c.weightx = 1; p.add(s, c);
         c.gridy++;
+    }
+
+    private static JPanel column() { return new JPanel(new GridBagLayout()); }
+
+    private static GridBagConstraints cell(int y) {
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridx = 0; c.gridy = y; c.anchor = GridBagConstraints.WEST; c.fill = GridBagConstraints.HORIZONTAL;
+        c.insets = new Insets(2, 3, 2, 3); c.weightx = 1;
+        return c;
     }
 
     /** 1:1 mode: the frame is exactly 320×200 source pixels and can only be moved. */

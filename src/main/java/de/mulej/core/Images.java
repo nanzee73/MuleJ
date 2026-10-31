@@ -35,10 +35,10 @@ public final class Images {
     /** A C64 picture file MuleJ can read (see {@link C64Formats}); it is drawn with the selected palette. */
     public static boolean isC64File(Path file) { return C64Formats.isC64File(file.getFileName().toString()); }
 
-    /** A C64 hires picture (Art Studio, AFLI): suggests the hires target. */
+    /** A C64 hires picture (Art Studio, AFLI, NUFLI, MUFLI, MUIFLI): suggests the hires target. */
     public static boolean isHiresC64File(Path file) {
         String e = C64Formats.extension(file.getFileName().toString());
-        return isArtStudio(file) || e.equals("afl");
+        return isArtStudio(file) || java.util.List.of("afl", "nuf", "nup", "muf", "mup", "mui").contains(e);
     }
 
     public static boolean isKoala(Path file) {

@@ -13,6 +13,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class I18nTest {
 
@@ -45,18 +47,30 @@ class I18nTest {
         assertEquals(Set.of(), en);
     }
 
-    /** Without a stored choice the user interface starts in English (like FlipperJ). */
+    /**
+     * Without a stored choice the user interface follows the system language (English if MuleJ does not have it);
+     * a language chosen by hand is kept for the next start (like FlipperJ).
+     */
     @Test
-    void englishIsTheDefault() throws Exception {
+    void systemLanguageUntilOneIsChosen() throws Exception {
         java.util.prefs.Preferences p = java.util.prefs.Preferences.userRoot().node("de/mulej");
         String old = p.get("language", null);
         try {
             p.remove("language");
             I18n.init();
-            assertEquals(java.util.Locale.ENGLISH, I18n.locale());
-            assertEquals("Next ▶", I18n.tr("nav.next"));
+            assertTrue(I18n.followsSystem());
+            assertEquals(I18n.systemLocale(), I18n.locale());
+            assertTrue(java.util.List.of("en", "de").contains(I18n.locale().getLanguage()));
+            assertEquals(java.util.Locale.ENGLISH, I18n.supported(java.util.Locale.JAPANESE), "fallback is English");
+
             I18n.setLocale(java.util.Locale.GERMAN);
+            I18n.init();                                   // next start
+            assertFalse(I18n.followsSystem());
             assertEquals("Weiter ▶", I18n.tr("nav.next"));
+
+            I18n.useSystemLocale();
+            I18n.init();
+            assertTrue(I18n.followsSystem());
         } finally {
             if (old != null) p.put("language", old); else p.remove("language");
             I18n.init();

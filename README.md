@@ -90,7 +90,7 @@ The character set data is the C64 character ROM as shipped with Petmate, so Mule
 * **Save Koala / Art Studio / Petmate…** and **Save PRG…** (only once the colour check has passed) start in the folder of
   the source picture. The PRG shows the picture after `LOAD"NAME",8` and `RUN`; any key returns to BASIC.
 
-English and German user interface (*Language* menu, English by default, no restart needed).
+English and German user interface (*Language* menu, no restart needed). By default MuleJ follows the system language (English if it is neither English nor German); a language chosen by hand is remembered.
 
 ## Command line
 
@@ -191,7 +191,8 @@ The pages are `src/main/resources/de/mulej/help/help_<language>.html`.
 **Input:** every picture Java ImageIO reads (PNG, JPEG, GIF, BMP, WebP, TIFF, …) and C64 pictures from C64GfxLib:
 Koala Painter (`.kla .koa .gig`), Art Studio (`.art .aas .hpi`), Advanced Art Studio (`.ocp .mpic`),
 Drazpaint (`.drz .drp`), Drazlace (`.drl .dlp`), FLI / FLI Designer / FLI Graph / FLI Editor (`.fli .fd2 .bml .flg .fed`),
-AFLI (`.afl`), Gunpaint (`.gun .ifl`), Funpaint (`.fun .fp2`) and FlipperJ's raw files – also compressed.
+AFLI (`.afl`), Gunpaint (`.gun .ifl`), Funpaint (`.fun .fp2`), NUFLI (`.nuf .nup`), MUFLI (`.muf .mup`),
+MUIFLI (`.mui`) and FlipperJ's raw files – also compressed.
 They are drawn with the selected palette; interlace pictures are mixed like on screen.
 
 **Koala Painter** (`.kla`): `$6000` load address, 8000 bytes bitmap (cell by cell), 1000 bytes screen RAM,

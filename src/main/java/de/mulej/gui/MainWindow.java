@@ -63,6 +63,8 @@ public class MainWindow extends JFrame {
     private final Map<Step, JToggleButton> stepButtons = new EnumMap<>(Step.class);
     private final JPanel stepBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
     private final CardLayout settingsCards = new CardLayout();
+    /** Previews on top, settings of the current step below. */
+    private JSplitPane center;
     private final JPanel settingsPanel = new WidthTrackingPanel(settingsCards);
     private final Map<Step, JPanel> stepPanels = new EnumMap<>(Step.class);
     private final Map<Step, JPanel> skippedPanels = new EnumMap<>(Step.class);
@@ -109,6 +111,7 @@ public class MainWindow extends JFrame {
     private final JButton autoCell = I18n.tip(I18n.text(new JButton(), "chk.auto"), "chk.auto.tip");
     private final JButton resetCell = I18n.tip(I18n.text(new JButton(), "chk.resetCell"), "chk.resetCell.tip");
     private final JButton resetAll = I18n.tip(I18n.text(new JButton(), "chk.resetAll"), "chk.resetAll.tip");
+    private final JButton fixAll = I18n.tip(I18n.text(new JButton(), "chk.fixAll"), "chk.fixAll.tip");
     private final JLabel petsciiInfo = new JLabel();
     private JPanel bitmapResult, petsciiResult;
     private final Map<Integer, int[]> cellEdits = new HashMap<>();
@@ -190,11 +193,17 @@ public class MainWindow extends JFrame {
         shrinkable(settings);
         JScrollPane settingsScroll = new JScrollPane(settings, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
                 ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        settingsScroll.setPreferredSize(new Dimension(360, 400));
+        settingsScroll.setBorder(BorderFactory.createEmptyBorder());
+        settingsScroll.setPreferredSize(new Dimension(900, 250));
+        settingsScroll.setMinimumSize(new Dimension(100, 80));
         settingsScroll.getVerticalScrollBar().setUnitIncrement(16);
-        JPanel center = new JPanel(new BorderLayout(6, 0));
-        center.add(settingsScroll, BorderLayout.WEST);
-        center.add(buildPreviews(), BorderLayout.CENTER);
+        // the previews get the full width, the settings of the step sit below them; the divider can be moved
+        JComponent previews = buildPreviews();
+        previews.setMinimumSize(new Dimension(100, 150));
+        center = new JSplitPane(JSplitPane.VERTICAL_SPLIT, previews, settingsScroll);
+        center.setResizeWeight(1.0);                 // extra height goes to the pictures
+        center.setContinuousLayout(true);
+        center.setBorder(BorderFactory.createEmptyBorder());
         root.add(center, BorderLayout.CENTER);
         root.add(buildBottom(), BorderLayout.SOUTH);
         setContentPane(root);
@@ -232,19 +241,27 @@ public class MainWindow extends JFrame {
 
         JMenu language = I18n.text(new JMenu(), "menu.language");
         ButtonGroup lg = new ButtonGroup();
+        JRadioButtonMenuItem system = new JRadioButtonMenuItem();
+        I18n.bind(() -> system.setText(tr("opt.languageSystem", I18n.nativeName(I18n.systemLocale()))));
+        system.addActionListener(e -> {
+            I18n.useSystemLocale();                     // English if the system language is not available
+            refreshLanguage();
+        });
+        lg.add(system);
+        language.add(system);
+        language.addSeparator();
+        java.util.Map<Locale, JRadioButtonMenuItem> items = new java.util.HashMap<>();
         for (Locale l : I18n.supportedLocales()) {
-            String name = l.getDisplayLanguage(l);
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(name.substring(0, 1).toUpperCase(l) + name.substring(1),
-                    l.getLanguage().equals(I18n.locale().getLanguage()));
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(I18n.nativeName(l));
             item.addActionListener(e -> {
-                I18n.setLocale(l);
-                SwingUtilities.updateComponentTreeUI(this);
-                revalidate();
-                repaint();
+                I18n.setLocale(l);                      // remembered for the next start
+                refreshLanguage();
             });
             lg.add(item);
             language.add(item);
+            items.put(l, item);
         }
+        I18n.bind(() -> (I18n.followsSystem() ? system : items.get(I18n.locale())).setSelected(true));
 
         JMenu help = I18n.text(new JMenu(), "menu.help");
         JMenuItem guide = I18n.text(new JMenuItem(), "menu.help.guide");
@@ -382,9 +399,9 @@ public class MainWindow extends JFrame {
         // ⑤ colours
         JPanel colours = new JPanel(new GridBagLayout());
         c = gbc();
-        c.gridy = 0; c.weightx = 1; colours.add(buildPaletteGroup(), c);
-        c.gridy = 1; colours.add(bitmapColours = buildBitmapColours(), c);
-        c.gridy = 2; colours.add(petsciiColours = buildPetsciiColours(), c);
+        c.gridy = 0; c.weightx = 1; c.gridx = 0; colours.add(buildPaletteGroup(), c);   // side by side: less height
+        c.gridx = 1; colours.add(bitmapColours = buildBitmapColours(), c);
+        c.gridx = 2; colours.add(petsciiColours = buildPetsciiColours(), c);
         addGlue(colours);
         stepPanels.put(Step.COLOURS, colours);
 
@@ -498,20 +515,28 @@ public class MainWindow extends JFrame {
     /** Colour check and manual correction (multicolor / hires). */
     private JPanel buildBitmapResult() {
         JPanel p = group("chk.group");
-        GridBagConstraints c = gbc();
         checkLabel.setFont(checkLabel.getFont().deriveFont(Font.BOLD));
-        c.gridy = 0; c.weightx = 1; c.gridwidth = 2; p.add(checkLabel, c);
         JButton prev = I18n.tip(new JButton("◀"), "chk.prev.tip"), next = I18n.tip(new JButton("▶"), "chk.next.tip");
         prev.setMargin(new Insets(1, 6, 1, 6));
         next.setMargin(new Insets(1, 6, 1, 6));
         prev.addActionListener(e -> jumpToClash(-1));
         next.addActionListener(e -> jumpToClash(1));
-        c.gridy = 1; p.add(row(I18n.label("chk.conflict"), prev, next, markCells), c);
         ButtonGroup g = new ButtonGroup();
         g.add(toolSelect); g.add(toolPaint);
-        c.gridy = 2; p.add(row(I18n.label("chk.click"), toolSelect), c);
-        c.gridy = 3; p.add(row(Box.createHorizontalStrut(12), toolPaint, paintColour), c);
-        c.gridy = 4; p.add(cellLabel, c);
+
+        // three columns, so the group needs little height below the previews:
+        // check status and tools | selected cell and its colours | cell buttons
+        JPanel status = new JPanel(new GridBagLayout());
+        GridBagConstraints c = gbc();
+        c.gridy = 0; c.weightx = 1; status.add(checkLabel, c);
+        c.gridy = 1; status.add(row(I18n.label("chk.conflict"), prev, next, markCells), c);
+        c.gridy = 2; status.add(row(fixAll), c);
+        c.gridy = 3; status.add(row(I18n.label("chk.click"), toolSelect), c);
+        c.gridy = 4; status.add(row(Box.createHorizontalStrut(12), toolPaint, paintColour), c);
+
+        JPanel cell = new JPanel(new GridBagLayout());
+        c = gbc();
+        c.gridy = 0; c.weightx = 1; cell.add(cellLabel, c);
         JPanel sw = new JPanel(new GridLayout(2, 8, 2, 2));
         for (int i = 0; i < 16; i++) {
             JToggleButton b = new JToggleButton();
@@ -524,18 +549,27 @@ public class MainWindow extends JFrame {
             swatches[i] = b;
             sw.add(b);
         }
-        c.gridy = 5; p.add(sw, c);
-        c.gridy = 6; p.add(cellHint, c);
-        JPanel buttons = new JPanel(new GridLayout(2, 2, 3, 3));
+        c.gridy = 1; cell.add(sw, c);
+        c.gridy = 2; cell.add(cellHint, c);
+
+        JPanel buttons = new JPanel(new GridLayout(4, 1, 3, 3));
         buttons.add(applyCell);
         buttons.add(autoCell);
         buttons.add(resetCell);
         buttons.add(resetAll);
-        c.gridy = 7; p.add(buttons, c);
+
+        c = gbc();
+        c.gridy = 0; c.gridx = 0; c.weightx = 0.4; p.add(status, c);
+        c.gridx = 1; c.weightx = 0.6; p.add(cell, c);
+        c.gridx = 2; c.weightx = 0; p.add(buttons, c);
         applyCell.addActionListener(e -> applyCellColours());
         autoCell.addActionListener(e -> autoCellColours());
         resetCell.addActionListener(e -> resetSelectedCell());
+        fixAll.addActionListener(e -> fixAllCells());
         resetAll.addActionListener(e -> {
+            int answer = JOptionPane.showConfirmDialog(this, tr("chk.resetAll.confirm"), App.NAME,
+                    JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (answer != JOptionPane.YES_OPTION) return;
             cellEdits.clear();
             pixelEdits.clear();
             changed(Step.COLOURS);
@@ -657,6 +691,16 @@ public class MainWindow extends JFrame {
         @Override public int getScrollableUnitIncrement(Rectangle r, int o, int d) { return 16; }
         @Override public int getScrollableBlockIncrement(Rectangle r, int o, int d) { return r.height - 32; }
         @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        /** Only the step shown counts (a CardLayout would take the height of the tallest step). */
+        @Override public Dimension getPreferredSize() {
+            for (Component c : getComponents())
+                if (c.isVisible()) {
+                    Dimension d = c.getPreferredSize();
+                    Insets in = getInsets();
+                    return new Dimension(d.width + in.left + in.right, d.height + in.top + in.bottom);
+                }
+            return super.getPreferredSize();
+        }
         @Override public boolean getScrollableTracksViewportHeight() {
             return getParent() instanceof JViewport v && v.getHeight() > getPreferredSize().height;
         }
@@ -1004,6 +1048,7 @@ public class MainWindow extends JFrame {
         if (b != null) b.setSelected(true);
         boolean skipped = source != null && params().skipped(s);
         settingsCards.show(settingsPanel, (skipped ? "skipped-" : "") + s.name());
+        SwingUtilities.invokeLater(this::fitSettings);
         updateViews();
         updateEnabled();
     }
@@ -1171,6 +1216,7 @@ public class MainWindow extends JFrame {
         }
         for (JButton b : new JButton[]{applyCell, autoCell, resetCell}) b.setEnabled(has);
         resetAll.setEnabled(!cellEdits.isEmpty() || !pixelEdits.isEmpty());
+        fixAll.setEnabled(r != null && !r.clashCells().isEmpty());
         if (has) {
             C64Mode m = r.mode();
             int used = 0;
@@ -1221,6 +1267,16 @@ public class MainWindow extends JFrame {
         cellEdits.put(selectedCell, BitmapConverter.suggestColours(o.pixelized(), Pipeline.bitmapSettings(params()),
                 selectedCell, o.bitmap().background()));
         removePixelEditsInCell(selectedCell);
+        changed(Step.COLOURS);
+    }
+
+    /** Every cell with too many colours gets the colours that reproduce it best, like "Automatic" for one cell. */
+    private void fixAllCells() {
+        Pipeline.Outputs o = outputs;
+        if (o == null || o.bitmap() == null || o.bitmap().clashCells().isEmpty()) return;
+        var settings = Pipeline.bitmapSettings(params());
+        for (int cell : o.bitmap().clashCells())
+            cellEdits.put(cell, BitmapConverter.suggestColours(o.pixelized(), settings, cell, o.bitmap().background()));
         changed(Step.COLOURS);
     }
 
@@ -1275,6 +1331,21 @@ public class MainWindow extends JFrame {
                 }
             }
         });
+    }
+
+    /** Moves the divider so the settings of the shown step fit (at most half of the height). */
+    private void fitSettings() {
+        if (center == null || center.getHeight() <= 0) return;
+        settingsPanel.revalidate();
+        int want = settingsPanel.getPreferredSize().height + 4;
+        int max = center.getHeight() / 2;
+        center.setDividerLocation(center.getHeight() - center.getDividerSize() - Math.min(want, max));
+    }
+
+    private void refreshLanguage() {
+        SwingUtilities.updateComponentTreeUI(this);
+        revalidate();
+        repaint();
     }
 
     private void chooseInput() {
