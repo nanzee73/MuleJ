@@ -142,9 +142,19 @@ public final class CharsetImage {
 
     // ------------------------------------------------------------------ KickAssembler
 
+    /**
+     * Base name that is safe inside KickAssembler source and as file name: only letters, digits, '.', '_' and '-'
+     * (a quote or line break in a file name could otherwise inject assembler directives).
+     */
+    public static String safeName(String base) {
+        String s = base == null ? "" : base.replaceAll("[^A-Za-z0-9._-]", "_").replaceAll("^\\.+", "_");
+        return s.isEmpty() ? "charset" : s;
+    }
+
     /** File names of the binary parts for a base name. */
     public record Files(String charset, String screen, String colours, String tiles, String tileColours, String map) {
         public static Files of(String base) {
+            base = safeName(base);
             return new Files(base + "_charset.bin", base + "_screen.bin", base + "_colours.bin",
                     base + "_tiles.bin", base + "_tilecolours.bin", base + "_map.bin");
         }
@@ -152,6 +162,7 @@ public final class CharsetImage {
 
     /** KickAssembler source (plain ASCII) that defines the constants and imports the binary parts. */
     public String kickAssembler(String base) {
+        base = safeName(base);
         Files f = Files.of(base);
         StringBuilder s = new StringBuilder();
         s.append("// ").append(base).append(" - character set exported by MuleJ (KickAssembler)\n");

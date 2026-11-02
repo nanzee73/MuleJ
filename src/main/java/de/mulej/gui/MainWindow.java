@@ -1282,19 +1282,19 @@ public class MainWindow extends JFrame {
             strength.setValue((Integer) m.get("dit.strength"));
             serpentine.setSelected((Boolean) m.get("dit.serpentine"));
             bleeding.setSelected((Boolean) m.get("dit.bleeding"));
-            backgroundBox.setSelectedIndex((Integer) m.get("bmp.background"));
+            select(backgroundBox, (Integer) m.get("bmp.background"));
             fixClashes.setSelected((Boolean) m.get("bmp.fix"));
             charsetBox.setSelectedItem(m.get("pet.charset"));
             textChars.setSelected((Boolean) m.get("pet.text"));
-            petBackgroundBox.setSelectedIndex((Integer) m.get("pet.group"));
+            select(petBackgroundBox, (Integer) m.get("pet.group"));
             detail.setValue((Integer) m.get("pet.detail"));
             diffusion.setValue((Integer) m.get("pet.diffusion"));
             calm.setValue((Integer) m.get("pet.calm"));
-            csMax.setValue(m.get("cs.max"));
+            csMax.setValue(Math.max(2, Math.min(256, (Integer) m.get("cs.max"))));
             csTiles.setSelectedItem(m.get("cs.tiles"));
-            csBackground.setSelectedIndex((Integer) m.get("cs.background"));
-            csMc1.setSelectedIndex((Integer) m.get("cs.mc1"));
-            csMc2.setSelectedIndex((Integer) m.get("cs.mc2"));
+            select(csBackground, (Integer) m.get("cs.background"));
+            select(csMc1, (Integer) m.get("cs.mc1"));
+            select(csMc2, (Integer) m.get("cs.mc2"));
             List<Object> edits = (List<Object>) m.get("chk.group");
             cellEdits.clear();
             ((Map<Integer, List<Integer>>) edits.get(0)).forEach((k, v) ->
@@ -1309,6 +1309,11 @@ public class MainWindow extends JFrame {
         showStep(current);
         dirtyFrom = Step.FRAME;
         changed(Step.FRAME);
+    }
+
+    /** Selects an index; values from a (possibly edited) project file outside the list are ignored. */
+    private static void select(JComboBox<?> box, int index) {
+        if (index >= 0 && index < box.getItemCount()) box.setSelectedIndex(index);
     }
 
     private Pipeline.Params params() {
@@ -1960,6 +1965,7 @@ public class MainWindow extends JFrame {
     /** KickAssembler source plus binary parts; returns the number of binary files. */
     private static int writeCharset(CharsetImage c, Path dir, String base) throws java.io.IOException {
         CharsetImage.Files f = CharsetImage.Files.of(base);
+        base = CharsetImage.safeName(base);
         Files.writeString(dir.resolve(base + ".asm"), c.kickAssembler(base), StandardCharsets.US_ASCII);
         Files.write(dir.resolve(f.charset()), c.charsetBytes());
         Files.write(dir.resolve(f.screen()), c.screenBytes());

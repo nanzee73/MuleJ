@@ -125,6 +125,11 @@ class CharsetTest {
         for (String f : new String[]{"pic_charset.bin", "pic_screen.bin", "pic_colours.bin", "pic_tiles.bin",
                 "pic_tilecolours.bin", "pic_map.bin"})
             assertTrue(asm.contains(".import binary \"" + f + "\""), f);
+        // a file name cannot inject assembler directives
+        String evil = c.kickAssembler("x\"\n.eval 1\n\"");
+        assertFalse(evil.contains("\n.eval"));
+        assertEquals("x__.eval_1__", CharsetImage.safeName("x\"\n.eval 1\n\""));
+        assertEquals("__x", CharsetImage.safeName("../x"));
         byte[] prg = ViewerPrg.charset(c);
         assertEquals(0x01, prg[0]);
         assertEquals(0x08, prg[1]);

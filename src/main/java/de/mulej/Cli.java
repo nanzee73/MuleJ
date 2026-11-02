@@ -245,7 +245,7 @@ public final class Cli {
                     CharsetImage c = CharsetConverter.convert(src, pal, space,
                             new CharsetConverter.Settings(mc, maxChars, tiles, bg, mc1, mc2), ds);
                     Path target = out != null ? out : Images.sibling(in, ".asm");
-                    String base = target.getFileName().toString().replaceFirst("\\.asm$", "");
+                    String base = CharsetImage.safeName(target.getFileName().toString().replaceFirst("\\.asm$", ""));
                     Path dirOut = target.toAbsolutePath().getParent();
                     CharsetImage.Files f = CharsetImage.Files.of(base);
                     Files.writeString(dirOut.resolve(base + ".asm"), c.kickAssembler(base), java.nio.charset.StandardCharsets.US_ASCII);
