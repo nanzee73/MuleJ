@@ -5,7 +5,7 @@ import de.c64gfx.format.KoalaImage;
 import de.c64gfx.prg.Asm6502;
 
 /**
- * Runnable C64 program that shows a multicolor or hires bitmap or a PETSCII text screen: {@code LOAD"NAME",8,1} (or ,8) and {@code RUN}.
+ * Runnable C64 program that shows a multicolor or hires bitmap, a PETSCII text screen or a character set picture: {@code LOAD"NAME",8,1} (or ,8) and {@code RUN}.
  * Any key returns to BASIC with the normal text screen.
  * <p>
  * Memory map (VIC bank 0, everything already in place after loading, nothing is unpacked):
@@ -14,8 +14,8 @@ import de.c64gfx.prg.Asm6502;
  * $080D        viewer code
  * $0C00-$0FE7  screen RAM (bitmaps: the VIC reads it there directly; PETSCII: copied to $0400)
  * $1000-$13E7  colour RAM data (multicolor, PETSCII), copied to $D800
- * $13E8 / $13E9 background ($D021) / border ($D020)
- * $2000-$3F3F  bitmap
+ * $13E8 / $13E9 background ($D021) / border ($D020); character sets: $13EA / $13EB = $D022 / $D023
+ * $2000-$3F3F  bitmap (character sets: $2000-$27FF)
  * </pre>
  * $1000-$1FFF cannot hold screen or bitmap for the VIC (it sees the character ROM there), but the CPU can use it for data.
  */
@@ -71,6 +71,46 @@ public final class ViewerPrg {
         a.org(SCREEN).bytes(codes);
         a.org(COLOR_DATA).bytes(cols);
         a.org(BG).bytes(p.background & 15, p.border & 15);
+        return withLoadAddress(a.assemble());
+    }
+
+    /** Character set data: VIC bank 0, $D018 = $38 → screen $0C00, character set $2000. */
+    static final int MC1 = 0x13EA, MC2 = 0x13EB, CHARSET = 0x2000;
+
+    /**
+     * Character set picture: the screen stays at $0C00, the character set lies at $2000 (both seen by the VIC),
+     * the colours are copied to $D800.
+     */
+    public static byte[] charset(CharsetImage c) {
+        Asm6502 a = new Asm6502(BASIC);
+        a.bytes(0x0B, 0x08, 0x0A, 0x00, 0x9E, '2', '0', '6', '1', 0x00, 0x00, 0x00);
+        a.ldaImm(0).staAbs(0xC6);
+        a.ldaAbs(0xDD02).oraImm(0x03).staAbs(0xDD02);
+        a.ldaAbs(0xDD00).oraImm(0x03).staAbs(0xDD00);      // VIC bank 0
+        a.ldaImm(0x1B).staAbs(0xD011);                     // text mode
+        a.ldaImm(c.multicolor ? 0xD8 : 0xC8).staAbs(0xD016);
+        a.ldaImm(0x38).staAbs(0xD018);                     // screen $0C00, characters $2000
+        a.ldaAbs(BG).staAbs(0xD021);
+        a.ldaAbs(BORDER).staAbs(0xD020);
+        a.ldaAbs(MC1).staAbs(0xD022);
+        a.ldaAbs(MC2).staAbs(0xD023);
+        a.ldxImm(0).label("copy");
+        for (int off : new int[]{0, 0x100, 0x200, 0x2E8}) a.ldaAbsX(COLOR_DATA + off).staAbsX(0xD800 + off);
+        a.inx().bne("copy");
+        a.label("wait").jsr(0xFFE4).beq("wait");
+        a.ldaImm(0x1B).staAbs(0xD011);
+        a.ldaImm(0xC8).staAbs(0xD016);
+        a.ldaImm(0x15).staAbs(0xD018);
+        a.ldaImm(0x0E).staAbs(0xD020);
+        a.ldaImm(0x06).staAbs(0xD021);
+        a.ldaImm(0x0E).staAbs(0x0286);
+        a.jsr(0xE544);
+        a.rts();
+        if (a.pc() > SCREEN) throw new IllegalStateException("Viewer code too long");
+        a.org(SCREEN).bytes(c.screenBytes());
+        a.org(COLOR_DATA).bytes(c.colourBytes());
+        a.org(BG).bytes(c.background & 15, c.border & 15, c.mc1 & 15, c.mc2 & 15);
+        a.org(CHARSET).bytes(c.charsetBytes());
         return withLoadAddress(a.assemble());
     }
 

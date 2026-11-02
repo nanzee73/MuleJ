@@ -81,6 +81,29 @@ class PetsciiTest {
     }
 
     @Test
+    void ditheringKeepsTheRulesAndChangesTheResult() {
+        BufferedImage photo = PipelineTest.photo(320, 200);
+        PetsciiConverter.Settings d = PetsciiConverter.Settings.defaults();
+        PetsciiImage plain = PetsciiConverter.convert(photo, P, ColorMatcher.Space.YUV, d);
+        PetsciiImage dith = PetsciiConverter.convert(photo, P, ColorMatcher.Space.YUV,
+                new PetsciiConverter.Settings(d.charset(), d.textChars(), d.background(), d.detail(), d.diffusion(), d.calm(),
+                        new de.c64gfx.dither.Ditherer.Settings(de.c64gfx.dither.Dither.FLOYD_STEINBERG, 80, true, true)));
+        assertTrue(dith.check().isEmpty());
+        assertEquals(plain.background, dith.background);       // the background comes from the first pass
+        for (int c : dith.codes) assertFalse(Charset.UPPER.isText(c));
+        assertFalse(java.util.Arrays.equals(plain.codes, dith.codes));
+        // the dithered template only uses background and cell colour
+        int[] fg = PetsciiConverter.mixColours(photo, P, ColorMatcher.Space.YUV, dith.background);
+        BufferedImage t = PetsciiConverter.dither(photo, P, ColorMatcher.Space.YUV, dith.background, fg,
+                new de.c64gfx.dither.Ditherer.Settings(de.c64gfx.dither.Dither.BAYER4, 80, false, true));
+        for (int y = 0; y < 200; y++)
+            for (int x = 0; x < 320; x++) {
+                int c = t.getRGB(x, y) & 0xFFFFFF, cell = (y / 8) * 40 + x / 8;
+                assertTrue(c == P.rgb(dith.background) || c == P.rgb(fg[cell]));
+            }
+    }
+
+    @Test
     void petmateRoundTrip() {
         PetsciiImage p = randomScreen(9, Charset.LOWER, false);
         String json = p.toPetmate("Test \"pic\"");

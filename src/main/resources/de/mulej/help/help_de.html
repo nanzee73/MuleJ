@@ -1,14 +1,15 @@
 <html><body>
 <h1>MuleJ – Anleitung</h1>
 <p>MuleJ macht aus beliebigen Bildern C64-Grafik: ein <b>Multicolor</b>-Bild (Koala Painter), ein <b>Hires</b>-Bild
-(Art Studio) oder einen <b>PETSCII</b>-Textbildschirm (Petmate) – jeweils auch als startbares C64-Programm. MuleJ prüft,
+(Art Studio), einen <b>PETSCII</b>-Textbildschirm (Petmate) oder einen <b>Zeichensatz</b> mit Bildschirm und Meta-Tiles
+für Demo-Effekte (KickAssembler) – jeweils auch als startbares C64-Programm. MuleJ prüft,
 ob jede Zelle die C64-Farbregeln einhält, und kann die Zellen korrigieren, die es nicht tun. Alles geht auch auf der
 Kommandozeile.</p>
 
 <p><b>Inhalt</b></p>
 <ul>
 <li><a href="#quick">Schnellstart</a></li>
-<li><a href="#targets">Ziele: Multicolor, Hires, PETSCII</a></li>
+<li><a href="#targets">Ziele: Multicolor, Hires, PETSCII, Zeichensatz</a></li>
 <li><a href="#chain">Die Kette der Schritte</a></li>
 <li><a href="#input">Bilder öffnen und „Weiter ab“</a></li>
 <li><a href="#frame">Schritt 2: Ausschnitt</a></li>
@@ -16,6 +17,7 @@ Kommandozeile.</p>
 <li><a href="#pixel">Schritt 4: Pixelizer</a></li>
 <li><a href="#colours">Schritt 5: Farben</a></li>
 <li><a href="#petscii">PETSCII-Einstellungen</a></li>
+<li><a href="#charset">Zeichensatz & Tiles</a></li>
 <li><a href="#result">Schritt 6: Ergebnis – Farbcheck, Korrektur, Bearbeiten</a></li>
 <li><a href="#save">Speichern</a></li>
 <li><a href="#projects">Projekte</a></li>
@@ -26,7 +28,7 @@ Kommandozeile.</p>
 
 <a name="quick"></a><h2>Schnellstart</h2>
 <ol>
-<li>Oben das <b>Ziel</b> wählen: Multicolor, Hires oder PETSCII.</li>
+<li>Oben das <b>Ziel</b> wählen: Multicolor, Hires, PETSCII oder Zeichensatz.</li>
 <li><b>Bild öffnen…</b> oder eine Datei ins Fenster ziehen. MuleJ schaut sich das Bild an und entscheidet, wo es
 anfängt (siehe <a href="#input">Weiter ab</a>).</li>
 <li>Mit <b>Weiter ▶</b> und <b>◀ Zurück</b> durch die Schritte gehen oder oben in der Leiste einen Schritt anklicken.
@@ -41,13 +43,14 @@ und/oder eine startbare <b>PRG</b> speichern.</li>
 <tr><td>Multicolor</td><td>160×200, doppelt breite Pixel</td><td>pro 4×8-Zelle 3 Farben plus eine Hintergrundfarbe für das ganze Bild</td><td>Koala Painter (.kla)</td></tr>
 <tr><td>Hires</td><td>320×200</td><td>pro 8×8-Zelle 2 Farben</td><td>Art Studio (.art)</td></tr>
 <tr><td>PETSCII</td><td>40×25 Zeichen</td><td>pro 8×8-Zelle ein Zeichen in einer Farbe plus eine gemeinsame Hintergrundfarbe</td><td>Petmate-Arbeitsbereich (.petmate)</td></tr>
+<tr><td>Zeichensatz</td><td>40×25 Zeichen, eigener Zeichensatz</td><td>Hires-Zeichen: Hintergrund plus eine Farbe pro Zelle; Multicolor-Zeichen: Hintergrund, $D022, $D023 plus eine Farbe 0–7 pro Zelle; höchstens 256 (oder weniger) Zeichen</td><td>KickAssembler-Quelltext + .bin-Dateien</td></tr>
 </table>
 
 <a name="chain"></a><h2>Die Kette der Schritte</h2>
 <p>Die beiden Vorschauen zeigen Eingabe und Ausgabe des aktuellen Schritts, darunter stehen die Einstellungen des
 Schritts. Mit dem Trennbalken zwischen Vorschauen und Einstellungen änderst du die Größen – beim Schrittwechsel wird er
 passend gesetzt.</p>
-<p><b>1 Original</b> → <b>2 Ausschnitt</b> → <b>3 Vorbereiten</b> → <b>4 Pixelizer</b> (nur Multicolor) →
+<p><b>1 Original</b> → <b>2 Ausschnitt</b> → <b>3 Vorbereiten</b> → <b>4 Pixelizer</b> (nur Multicolor-Bitmap oder Multicolor-Zeichen) →
 <b>5 Farben</b> → <b>6 Ergebnis</b>. Jeder Schritt arbeitet mit der Ausgabe des vorigen. Änderst du etwas in einem
 frühen Schritt, aktualisieren sich alle späteren automatisch. Ein „übersprungener“ Schritt reicht das Bild unverändert
 durch; <b>Diesen Schritt ausführen</b> schaltet ihn wieder ein.</p>
@@ -86,6 +89,7 @@ Zielformat binden</b>.</li>
 und Sättigung.</p>
 
 <a name="pixel"></a><h2>Schritt 4: Pixelizer (nur Multicolor)</h2>
+<p>Der Schritt erscheint bei Multicolor-Bildern und bei Zeichensätzen mit Multicolor-Zeichen.</p>
 <p>Multicolor-Pixel sind doppelt so breit, also wird aus jedem Pixelpaar eines. Welcher Pixel übrig bleibt, entscheidet
 darüber, wie dünne Linien aussehen:</p>
 <ul>
@@ -101,7 +105,8 @@ Paletten-Editor: Farben ändern, .vpl-/.gpl-/Hex-Dateien laden, als .vpl speiche
 <li><b>Abgleich:</b> wie „ähnlich“ gemessen wird – <i>RGB euklidisch</i> (wie der alte c64palettizer),
 <i>RGB gewichtet</i>, <i>YUV</i> oder <i>HSL</i>.</li>
 <li><b>Dithering</b> (Floyd-Steinberg, Atkinson, Jarvis, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8) mischt Farben in feinen
-Mustern. <b>Stärke</b> legt fest, wie viel; <b>Schlangenlinie (Serpentine)</b> vermeidet diagonale Muster.</li>
+Mustern. <b>Stärke</b> legt fest, wie viel; <b>Schlangenlinie (Serpentine)</b> vermeidet diagonale Muster. Dithering
+gibt es für jedes Ziel: bei PETSCII und Zeichensatz arbeitet es mit den Farben, die für jede Zelle gewählt wurden.</li>
 <li><b>Bleeding (über Zellgrenzen):</b> Der Dither-Fehler darf in Nachbarzellen weiterlaufen – weicher, aber die
 Zellkanten werden weniger sauber.</li>
 <li><b>Hintergrund:</b> automatisch (beste Farbe) oder fest (Multicolor und PETSCII).</li>
@@ -119,7 +124,35 @@ weichgezeichnet bewertet, so wie das Auge es sieht.</p>
 <li><b>Diffusion:</b> wie viel vom Restfehler einer Zelle an die Nachbarn weitergegeben wird (gut für Verläufe und Flächen).</li>
 <li><b>Ruhe:</b> unruhige Zeichen erscheinen nur dort, wo sie deutlich helfen.</li>
 </ul>
+<p><b>Dithering</b> (in der Gruppe links) ist auch bei PETSCII möglich: Ein erster Durchgang wählt den Hintergrund und
+für jede Zelle die Farbe, die sich am besten mit ihm mischt. Dann wird das Bild nur mit diesen zwei Farben pro Zelle
+gedithert, und ein zweiter, pixelgenauer Durchgang sucht die Zeichen, die dem Dither-Muster folgen – Schachbrett- und
+Punktzeichen geben die Zwischentöne wieder. Geordnetes Dithering (Bayer) ergibt ruhige, gleichmäßige Muster;
+Floyd-Steinberg und Atkinson mehr Detail.</p>
 <p>Zum Weiterbearbeiten eines PETSCII-Bildes als Petmate-Datei speichern und in Petmate öffnen.</p>
+
+<a name="charset"></a><h2>Zeichensatz & Tiles</h2>
+<p>Das Ziel <b>Zeichensatz</b> macht aus dem Bild einen eigenen Zeichensatz plus einen Bildschirm aus Zeichencodes und
+Farben – das Rohmaterial für Demo-Effekte (Scroller, Tile-Engines, Zeichen-Animationen).</p>
+<ul>
+<li><b>Hires-Zeichen</b> (8×8 Pixel): ein gemeinsamer Hintergrund plus eine Farbe (0–15) pro Zelle.
+<b>Multicolor-Zeichen</b> (4×8 doppelt breite Pixel, der Pixelizer-Schritt erscheint): Hintergrund, $D022 und $D023 für
+den ganzen Bildschirm plus eine Farbe 0–7 pro Zelle (im Farb-RAM mit gesetztem Bit 3).</li>
+<li><b>Max. Zeichen</b> (2–256): Jede Zelle bekommt erst ihr eigenes exaktes Zeichen. Sind es mehr, werden die
+ähnlichsten zusammengelegt (k-Means auf dem Farbfehler), und jede Zelle nimmt die Farbe, die am besten zum gemeinsamen
+Zeichen passt. Weniger Zeichen = mehr Speicher für Code, aber ein gröberes Bild.</li>
+<li><b>Meta-Tiles</b> 1×1, 2×2 oder 4×4: Der Bildschirm wird zusätzlich als Karte aus Tiles von n×n Zeichen beschrieben;
+gleiche Tiles werden nur einmal gespeichert. Die Karte hat ⌈40/n⌉×⌈25/n⌉ Einträge; Stellen außerhalb des Bildschirms
+bekommen das leere Zeichen (Code 0). Bei mehr als 256 Tiles braucht die Karte zwei Bytes pro Eintrag.</li>
+<li><b>Hintergrund</b>, <b>$D022</b>, <b>$D023</b>: automatisch (beste Farben für das Bild) oder fest.</li>
+<li><b>Dithering</b> arbeitet mit den Farben jeder Zelle.</li>
+</ul>
+<p><b>KickAssembler speichern (.asm + .bin)…</b> schreibt <i>NAME.asm</i> mit Konstanten (CHAR_COUNT, MULTICOLOR,
+BACKGROUND, MC1, MC2, TILE_SIZE, TILE_COUNT, MAP_COLS, MAP_ROWS, MAP_16BIT) und Labels mit <code>.import binary</code>,
+dazu <i>NAME_charset.bin</i>, <i>NAME_screen.bin</i>, <i>NAME_colours.bin</i> und mit Tiles <i>NAME_tiles.bin</i>,
+<i>NAME_tilecolours.bin</i> und <i>NAME_map.bin</i>. Der Zeichensatz wird auf $800 ausgerichtet, wie der VIC es braucht.
+<b>Zeichensatz als PNG…</b> speichert die Zeichen als Bild (16 pro Zeile); <b>PRG speichern…</b> zeigt den Bildschirm
+auf dem C64 (Zeichensatz bei $2000, Bildschirm bei $0C00).</p>
 
 <a name="result"></a><h2>Schritt 6: Ergebnis – Farbcheck, Korrektur, Bearbeiten</h2>
 <p>MuleJ prüft alle 1000 Zellen. „✔“ heißt, jede Zelle hält die Regeln ein; „✘“ zeigt, wie viele Zellen zu viele
@@ -140,8 +173,8 @@ zurücksetzen.</li>
 
 <a name="save"></a><h2>Speichern</h2>
 <ul>
-<li><b>Koala speichern (.kla)… / Art Studio speichern (.art)… / Petmate speichern…</b> – die C64-Datei, erst wenn der
-Farbcheck bestanden ist. Vorgeschlagen wird der Ordner des Quellbildes.</li>
+<li><b>Koala speichern (.kla)… / Art Studio speichern (.art)… / Petmate speichern… / KickAssembler speichern
+(.asm + .bin)…</b> – die C64-Datei, erst wenn der Farbcheck bestanden ist. Vorgeschlagen wird der Ordner des Quellbildes.</li>
 <li><b>PRG speichern…</b> – ein startbares C64-Programm, das das Bild zeigt: <code>LOAD"NAME",8</code> und <code>RUN</code>;
 eine beliebige Taste beendet es.</li>
 <li><b>Diesen Schritt als PNG…</b> – die Ausgabe des gezeigten Schritts ohne Markierungen, z. B. um sie am PC oder Handy
@@ -189,6 +222,7 @@ geöffnetes Bild beginnt einen neuen Verlauf.</p>
 <tr><td><code>koala</code></td><td>Multicolor-Bitmap → NAME.kla</td></tr>
 <tr><td><code>hires</code></td><td>Hires-Bitmap → NAME.art</td></tr>
 <tr><td><code>petscii</code></td><td>Textbildschirm → NAME.petmate</td></tr>
+<tr><td><code>chars</code></td><td>Zeichensatz + Bildschirm (+ Tiles) → NAME.asm + NAME_*.bin</td></tr>
 <tr><td><code>check</code></td><td>listet die Zellen auf, die die Regeln von <code>--mode mc|hires</code> verletzen</td></tr>
 <tr><td><code>topng</code></td><td>C64-Bild oder Petmate-Datei → NAME.png</td></tr>
 </table>
@@ -196,7 +230,9 @@ geöffnetes Bild beginnt einen neuen Verlauf.</p>
 <code>--fit stretch|fit|fill|none</code>, <code>--dither NAME</code>, <code>--strength N</code>, <code>--serpentine</code>,
 <code>--no-bleeding</code>, <code>--bg auto|0..15</code>, <code>--fix-clashes</code>, <code>--preview DATEI.png</code>,
 <code>--prg DATEI.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
-<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>.
+<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>,
+<code>--mode mc|hires</code>, <code>--max N</code>, <code>--tiles 1|2|4</code>, <code>--mc1/--mc2 auto|0..15</code>,
+<code>--charset-png DATEI.png</code>.
 <code>mulej --help</code> listet alle auf. Die alte <code>-if DATEI</code>-Schreibweise von c64palettizer, c64pixelizer
 und c64koalaverter funktioniert weiterhin.</p>
 

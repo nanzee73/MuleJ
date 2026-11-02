@@ -23,9 +23,9 @@ public final class Pipeline {
 
     /** What the picture becomes. */
     public enum Target {
-        MULTICOLOR(C64Mode.MULTICOLOR), HIRES(C64Mode.HIRES), PETSCII(null);
+        MULTICOLOR(C64Mode.MULTICOLOR), HIRES(C64Mode.HIRES), PETSCII(null), CHARSET(null);
 
-        /** Bitmap mode, null for PETSCII. */
+        /** Bitmap mode, null for PETSCII and character sets. */
         public final C64Mode mode;
 
         Target(C64Mode mode) { this.mode = mode; }
@@ -39,20 +39,30 @@ public final class Pipeline {
         @Override public String toString() { return de.c64gfx.swing.I18n.tr("step." + name()); }
     }
 
+    /** Whether the target works with double-wide pixels (multicolour bitmap or multicolour characters). */
+    public static boolean usesPixelizer(Target t, boolean multicolorChars) {
+        return t == Target.MULTICOLOR || t == Target.CHARSET && multicolorChars;
+    }
+
     /** The steps of a target in order (the pixelizer only exists for multicolor). */
-    public static List<Step> steps(Target t) {
+    public static List<Step> steps(Target t) { return steps(t, false); }
+
+    /** The steps of a target in order; {@code multicolorChars}: character set target with multicolour characters. */
+    public static List<Step> steps(Target t, boolean multicolorChars) {
         List<Step> l = new ArrayList<>(List.of(Step.values()));
-        if (t != Target.MULTICOLOR) l.remove(Step.PIXELIZER);
+        if (!usesPixelizer(t, multicolorChars)) l.remove(Step.PIXELIZER);
         return l;
     }
 
     /** Steps the chain may start at for this target and picture. */
-    public static List<Step> entries(Target t, BufferedImage src) {
+    public static List<Step> entries(Target t, BufferedImage src) { return entries(t, false, src); }
+
+    public static List<Step> entries(Target t, boolean multicolorChars, BufferedImage src) {
         List<Step> l = new ArrayList<>();
         l.add(Step.FRAME);
         if (src == null || ImageFitter.canTakeExactly(src)) {
-            for (Step s : steps(t)) if (s.ordinal() > Step.FRAME.ordinal()) l.add(s);
-            if (t == Target.PETSCII) l.remove(Step.RESULT);   // the characters have to be computed
+            for (Step s : steps(t, multicolorChars)) if (s.ordinal() > Step.FRAME.ordinal()) l.add(s);
+            if (t == Target.PETSCII || t == Target.CHARSET) l.remove(Step.RESULT);   // the characters have to be computed
         }
         return l;
     }
@@ -66,27 +76,43 @@ public final class Pipeline {
     public record Params(Target target, Step entry, ImageFitter.Settings fit, ImageAdjust.Settings adjust,
                          Pixelizer.Direction pair, Palette palette, ColorMatcher.Space space,
                          Ditherer.Settings dither, int background, boolean fixClashes,
-                         PetsciiConverter.Settings petscii, BitmapConverter.Edits edits) {
+                         PetsciiConverter.Settings petscii, CharsetConverter.Settings charset,
+                         BitmapConverter.Edits edits) {
+
+        public Params {
+            if (charset == null) charset = CharsetConverter.Settings.defaults();
+        }
+
+        /** Without the character set settings (they get their defaults). */
+        public Params(Target target, Step entry, ImageFitter.Settings fit, ImageAdjust.Settings adjust,
+                      Pixelizer.Direction pair, Palette palette, ColorMatcher.Space space,
+                      Ditherer.Settings dither, int background, boolean fixClashes,
+                      PetsciiConverter.Settings petscii, BitmapConverter.Edits edits) {
+            this(target, entry, fit, adjust, pair, palette, space, dither, background, fixClashes, petscii, null, edits);
+        }
 
         public static Params defaults(Target t) {
             return new Params(t, Step.FRAME, null, ImageAdjust.Settings.NEUTRAL, Pixelizer.Direction.L2R,
                     Palettes.COLODORE, ColorMatcher.Space.EUCLID, Ditherer.Settings.NONE, -1, false,
-                    PetsciiConverter.Settings.defaults(), BitmapConverter.Edits.none());
+                    PetsciiConverter.Settings.defaults(), CharsetConverter.Settings.defaults(), BitmapConverter.Edits.none());
         }
+
+        public List<Step> steps() { return Pipeline.steps(target, charset.multicolor()); }
 
         public boolean skipped(Step s) {
             if (s == Step.ORIGINAL) return false;
-            if (s == Step.PIXELIZER && target != Target.MULTICOLOR) return true;
+            if (s == Step.PIXELIZER && !usesPixelizer(target, charset.multicolor())) return true;
             return s.ordinal() < entry.ordinal();
         }
     }
 
     /**
-     * Results of all steps. {@code bitmap} is set for multicolor/hires, {@code petscii} for PETSCII.
-     * {@code error} is set if the colour step failed.
+     * Results of all steps. {@code bitmap} is set for multicolor/hires, {@code petscii} for PETSCII, {@code charset}
+     * for character sets. {@code error} is set if the colour step failed.
      */
     public record Outputs(BufferedImage original, BufferedImage framed, BufferedImage prepared, BufferedImage pixelized,
-                          BitmapConverter.Result bitmap, PetsciiImage petscii, BufferedImage colours, String error) {
+                          BitmapConverter.Result bitmap, PetsciiImage petscii, CharsetImage charset,
+                          BufferedImage colours, String error) {
 
         public BufferedImage image(Step s) {
             return switch (s) {
@@ -98,9 +124,11 @@ public final class Pipeline {
             };
         }
 
-        /** Colour check passed (always true for PETSCII). */
+        /** Colour check passed (always true for PETSCII and character sets). */
         public boolean ok() {
-            return error == null && (petscii != null ? petscii.check().isEmpty() : bitmap != null && bitmap.ok());
+            if (error != null) return false;
+            if (charset != null) return true;
+            return petscii != null ? petscii.check().isEmpty() : bitmap != null && bitmap.ok();
         }
     }
 
@@ -126,12 +154,16 @@ public final class Pipeline {
         try {
             if (p.target() == Target.PETSCII) {
                 PetsciiImage pet = PetsciiConverter.convert(pixelized, p.palette(), p.space(), p.petscii());
-                return new Outputs(src, framed, prepared, pixelized, null, pet, pet.render(p.palette()), null);
+                return new Outputs(src, framed, prepared, pixelized, null, pet, null, pet.render(p.palette()), null);
+            }
+            if (p.target() == Target.CHARSET) {
+                CharsetImage c = CharsetConverter.convert(pixelized, p.palette(), p.space(), p.charset(), p.dither());
+                return new Outputs(src, framed, prepared, pixelized, null, null, c, c.render(p.palette()), null);
             }
             BitmapConverter.Result r = BitmapConverter.convert(pixelized, bitmapSettings(p), p.edits());
-            return new Outputs(src, framed, prepared, pixelized, r, null, r.render(p.palette()), null);
+            return new Outputs(src, framed, prepared, pixelized, r, null, null, r.render(p.palette()), null);
         } catch (Exception e) {
-            return new Outputs(src, framed, prepared, pixelized, null, null, null, e.getMessage());
+            return new Outputs(src, framed, prepared, pixelized, null, null, null, null, e.getMessage());
         }
     }
 
@@ -171,7 +203,7 @@ public final class Pipeline {
         BufferedImage img = ImageFitter.takeExactly(src);
         Palette pal = paletteOf(img, preferred);
         if (pal == null) return new Detection(Step.PREPARE, preferred, "detect.prepare");
-        if (t == Target.PETSCII) return new Detection(Step.COLOURS, pal, "detect.coloursPetscii");
+        if (t == Target.PETSCII || t == Target.CHARSET) return new Detection(Step.COLOURS, pal, "detect.coloursPetscii");
         if (t == Target.MULTICOLOR && !pairsEqual(img))
             return new Detection(Step.PIXELIZER, pal, "detect.pixelizer");
         return new Detection(Step.RESULT, pal, "detect.result");

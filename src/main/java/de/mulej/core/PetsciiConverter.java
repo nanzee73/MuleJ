@@ -1,6 +1,7 @@
 package de.mulej.core;
 
 import de.c64gfx.color.ColorMatcher;
+import de.c64gfx.dither.Ditherer;
 import de.c64gfx.palette.Palette;
 
 import java.awt.image.BufferedImage;
@@ -26,6 +27,11 @@ import java.util.stream.IntStream;
  * The background is chosen by trying all 16 colours on the whole picture (or fixed). Then the cells are converted
  * row by row; the remaining average error of a cell is passed on to its neighbours (Floyd-Steinberg weights on cell
  * level, slider "error diffusion"), so areas and gradients keep their overall tone.
+ *
+ * <h2>Optional dithering</h2>
+ * With dithering a first pass chooses the background and the foreground colour of every cell. The picture is then
+ * dithered pixel by pixel with just these two colours per cell, and a second, pixel exact pass picks the characters
+ * that follow the dither pattern best – so checkerboard and dot characters render the in-between tones.
  */
 public final class PetsciiConverter {
 
@@ -36,10 +42,23 @@ public final class PetsciiConverter {
      * @param detail        0..100: share of the sharp (pixel exact) measure; the rest is the soft measure
      * @param diffusion     0..100: how much of a cell's remaining error is passed on to the neighbours
      * @param calm          0..100: penalty for busy characters, so they only appear where they really help
+     * @param dither        optional dithering before the characters are chosen ({@link Ditherer.Settings#NONE} = off)
      */
-    public record Settings(Charset charset, boolean textChars, int background, int detail, int diffusion, int calm) {
+    public record Settings(Charset charset, boolean textChars, int background, int detail, int diffusion, int calm,
+                           Ditherer.Settings dither) {
+        public Settings {
+            if (dither == null) dither = Ditherer.Settings.NONE;
+        }
+
+        public Settings(Charset charset, boolean textChars, int background, int detail, int diffusion, int calm) {
+            this(charset, textChars, background, detail, diffusion, calm, Ditherer.Settings.NONE);
+        }
+
         public static Settings defaults() { return new Settings(Charset.UPPER, false, -1, 40, 40, 30); }
     }
+
+    /** Detail of the second pass with dithering: mostly pixel exact, so the characters follow the pattern. */
+    static final int DITHER_DETAIL = 80;
 
     private static final int N = 64;
 
@@ -48,6 +67,67 @@ public final class PetsciiConverter {
     public static PetsciiImage convert(BufferedImage src, Palette pal, ColorMatcher.Space space, Settings s) {
         if (src.getWidth() != 320 || src.getHeight() != 200)
             throw new IllegalArgumentException("PETSCII needs a 320 x 200 picture.");
+        if (!s.dither().active()) return match(src, pal, space, s);
+        // pass 1: background
+        int bg = s.background() >= 0 ? s.background()
+                : match(src, pal, space, new Settings(s.charset(), s.textChars(), -1, s.detail(), s.diffusion(), s.calm())).background;
+        // per cell the colour that, mixed with the background, reproduces the cell best
+        int[] fg = mixColours(src, pal, space, bg);
+        BufferedImage dithered = dither(src, pal, space, bg, fg, s.dither());
+        // pass 2: characters that follow the dither pattern
+        return match(dithered, pal, space, new Settings(s.charset(), s.textChars(), bg, DITHER_DETAIL, 0, s.calm() / 3));
+    }
+
+    /**
+     * For every cell the foreground colour f whose mixes with the background (bg + t·(f − bg), 0 ≤ t ≤ 1) come
+     * closest to the cell's pixels – the best pair for dithering with two colours.
+     */
+    static int[] mixColours(BufferedImage src, Palette pal, ColorMatcher.Space space, int bg) {
+        Space sp = new Space(space);
+        float[][] pc = new float[16][];
+        for (int i = 0; i < 16; i++) pc[i] = sp.of(pal.r(i), pal.g(i), pal.b(i));
+        int[] fg = new int[PetsciiImage.CELLS];
+        IntStream.range(0, PetsciiImage.CELLS).parallel().forEach(cell -> {
+            int cx = (cell % PetsciiImage.COLS) * 8, cy = (cell / PetsciiImage.COLS) * 8;
+            float[][] px = new float[N][];
+            for (int p = 0; p < N; p++) {
+                int rgb = src.getRGB(cx + (p & 7), cy + (p >> 3));
+                px[p] = sp.of((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+            }
+            float[] b = pc[bg];
+            double bestE = Double.MAX_VALUE;
+            int best = bg == 0 ? 1 : 0;
+            for (int f = 0; f < 16; f++) {
+                if (f == bg) continue;
+                float d0 = pc[f][0] - b[0], d1 = pc[f][1] - b[1], d2 = pc[f][2] - b[2];
+                float dd = d0 * d0 + d1 * d1 + d2 * d2;
+                double e = 0;
+                for (float[] x : px) {
+                    float a0 = x[0] - b[0], a1 = x[1] - b[1], a2 = x[2] - b[2];
+                    float t = dd > 0 ? Math.max(0, Math.min(1, (a0 * d0 + a1 * d1 + a2 * d2) / dd)) : 0;
+                    float r0 = a0 - t * d0, r1 = a1 - t * d1, r2 = a2 - t * d2;
+                    e += r0 * r0 + r1 * r1 + r2 * r2;
+                }
+                if (e < bestE) { bestE = e; best = f; }
+            }
+            fg[cell] = best;
+        });
+        return fg;
+    }
+
+    /** Dithers the picture with two colours per 8×8 cell: background and the cell's foreground. */
+    static BufferedImage dither(BufferedImage src, Palette pal, ColorMatcher.Space space, int bg, int[] fg,
+                                Ditherer.Settings ds) {
+        int[][] allowed = new int[PetsciiImage.CELLS][];
+        for (int c = 0; c < allowed.length; c++) allowed[c] = fg[c] == bg ? new int[]{bg} : new int[]{bg, fg[c]};
+        float[] rgb = de.c64gfx.swing.Images.toFloat(src);
+        int[] idx = Ditherer.run(rgb, 320, 200, new ColorMatcher(pal, space, 50, 50, false), pal, ds, allowed, 8, 8);
+        BufferedImage out = new BufferedImage(320, 200, BufferedImage.TYPE_INT_RGB);
+        for (int i = 0; i < idx.length; i++) out.setRGB(i % 320, i / 320, pal.rgb(idx[i]));
+        return out;
+    }
+
+    private static PetsciiImage match(BufferedImage src, Palette pal, ColorMatcher.Space space, Settings s) {
         Space sp = new Space(space);
         float d = Math.max(0, Math.min(100, s.detail())) / 100f;
 

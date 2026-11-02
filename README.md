@@ -1,7 +1,7 @@
 # MuleJ
 
-Turns any picture into C64 graphics – **multicolour** (Koala Painter), **hires** (Art Studio) or **PETSCII** (Petmate) –
-each also as runnable PRG. Successor of the command line tools **c64palettizer**, **c64pixelizer** and
+Turns any picture into C64 graphics – **multicolour** (Koala Painter), **hires** (Art Studio), **PETSCII** (Petmate)
+or a **character set** with screen and meta tiles for demo effects (KickAssembler) – each also as runnable PRG. Successor of the command line tools **c64palettizer**, **c64pixelizer** and
 **c64koalaverter** (plus c64imager), with a Swing GUI in the style of FlipperJ. The command line keeps working, and with
 the default settings it produces the same results as the old tools.
 
@@ -10,14 +10,14 @@ the default settings it produces the same results as the old tools.
 Choose the **target** first, then open a picture (or drop it onto the window). Every picture runs through the same steps;
 each step has only its own settings, shows its input (left) and output (right), and its output can be saved as PNG.
 
-| Step | Multicolour | Hires | PETSCII | What happens |
-|---|---|---|---|---|
-| ① Original | ✔ | ✔ | ✔ | the loaded picture next to the final result |
-| ② Frame | ✔ | ✔ | ✔ | bring the picture to 320×200 (see below) |
-| ③ Prepare | ✔ | ✔ | ✔ | contrast, brightness, gamma, saturation – as in FlipperJ |
-| ④ Pixeliser | ✔ | – | – | two neighbouring pixels become one double-wide multicolour pixel (left→right or right→left) |
-| ⑤ Colours | ✔ | ✔ | ✔ | palette, colour matching, dithering; for PETSCII the characters |
-| ⑥ Result | ✔ | ✔ | ✔ | colour check, correction, saving as `.kla` / `.art` / `.petmate` and as PRG |
+| Step | Multicolour | Hires | PETSCII | Character set | What happens |
+|---|---|---|---|---|---|
+| ① Original | ✔ | ✔ | ✔ | ✔ | the loaded picture next to the final result |
+| ② Frame | ✔ | ✔ | ✔ | ✔ | bring the picture to 320×200 (see below) |
+| ③ Prepare | ✔ | ✔ | ✔ | ✔ | contrast, brightness, gamma, saturation – as in FlipperJ |
+| ④ Pixeliser | ✔ | – | – | multicolour chars | two neighbouring pixels become one double-wide multicolour pixel (left→right or right→left) |
+| ⑤ Colours | ✔ | ✔ | ✔ | ✔ | palette, colour matching, dithering; for PETSCII and character sets the characters |
+| ⑥ Result | ✔ | ✔ | ✔ | ✔ | colour check, correction, saving as `.kla` / `.art` / `.petmate` / `.asm` + `.bin` and as PRG |
 
 Every change is computed automatically from the changed step on. *Back* / *Next* or a click on a step moves between them.
 Until a picture is opened, everything except the target, *Open picture* and the menus is locked.
@@ -79,6 +79,30 @@ colour shared by the whole screen (`$D021`). MuleJ finds the combination that lo
 
 The character set data is the C64 character ROM as shipped with Petmate, so MuleJ and Petmate show the same glyphs.
 
+**Optional dithering:** a first pass chooses the background and, per cell, the colour whose mixes with it come closest to
+the cell. The picture is then dithered (any of the dither methods) with just these two colours per cell, and a second,
+pixel exact pass picks the characters that follow the dither pattern – checkerboard and dot characters render the
+in-between tones.
+
+### ⑤ Colours – character set & tiles (demo effects)
+
+The picture becomes an own character set plus a 40×25 screen of character codes and colours:
+
+* **Hires characters** (background + one colour 0–15 per cell) or **multicolour characters** (background, `$D022`,
+  `$D023` + one colour 0–7 per cell, colour RAM with bit 3 set; the pixeliser step is used). The shared colours are found
+  by trying the candidates on the whole picture, or are fixed.
+* **Max. characters** (2–256): every cell first gets its own exact character; if there are more, they are merged with
+  **k-means on the colour error** – a cell's distance to a character is the error it would cause, a group's character
+  takes in every pixel the value with the smallest summed error, and the cell colours are refitted. Identical
+  characters are stored once; the blank character gets code 0.
+* **Meta tiles** 1×1, 2×2 or 4×4: the screen as a map of n×n tiles (`⌈40/n⌉×⌈25/n⌉`, padded with the blank character),
+  identical tiles stored once, a 16-bit map if there are more than 256 tiles.
+* Optional dithering with the colours of each cell.
+
+Saving writes **KickAssembler** source (`NAME.asm`: `.const` values, `.align $800`, labels with `.import binary`) plus
+`NAME_charset.bin`, `NAME_screen.bin`, `NAME_colours.bin` and with tiles `NAME_tiles.bin`, `NAME_tilecolours.bin`,
+`NAME_map.bin`; the character set also as PNG (16 per row) and the screen as PRG.
+
 ### ⑥ Result
 
 * **Colour check** (multicolour/hires): “✔ all 1000 cells keep the rules” or “✘ 37 cells break the multicolour rules”;
@@ -86,8 +110,8 @@ The character set data is the C64 character ROM as shipped with Petmate, so Mule
 * **Manual correction** by clicking into the result: *Select cell* shows its colours with pixel counts – press the
   colours the cell may use and *Apply colours*, or *Automatic* for the best colours of this cell; *Paint* sets single
   pixels; *Reset cell* / *Discard all* undo. Corrected cells are marked yellow, the selected cell cyan.
-* PETSCII always keeps its rules (one character colour plus background per cell); to edit further, save as Petmate file.
-* **Save Koala / Art Studio / Petmate…** and **Save PRG…** (only once the colour check has passed) start in the folder of
+* PETSCII and character sets always keep their rules; to edit PETSCII further, save as Petmate file.
+* **Save Koala / Art Studio / Petmate / KickAssembler…** and **Save PRG…** (only once the colour check has passed) start in the folder of
   the source picture. The PRG shows the picture after `LOAD"NAME",8` and `RUN`; any key returns to BASIC.
 
 English and German user interface (*Language* menu, no restart needed). By default MuleJ follows the system language (English if it is neither English nor German); a language chosen by hand is remembered.
@@ -104,6 +128,8 @@ mulej koala image.png                           # -> image.kla
 mulej koala photo.jpg --fit fill --space yuv --dither fs --preview check.png --prg photo.prg
 mulej hires image.png --fix-clashes             # -> image.art
 mulej petscii photo.jpg --fit fill --contrast 20 --prg photo.prg   # -> photo.petmate + photo.prg
+mulej petscii photo.jpg --fit fill --dither bayer4             # PETSCII with dithering
+mulej chars logo.png --mode mc --max 128 --tiles 2 --prg logo.prg   # -> logo.asm + logo_*.bin
 mulej check pixelart.png --mode hires --no-palettize   # list every cell that breaks the rules
 mulej topng image.kla                           # -> image.png (any C64 picture or .petmate)
 mulej palettize -if image.png                   # the old -if syntax still works
@@ -112,7 +138,8 @@ mulej --help
 
 Exit codes as before: 0 = OK, 1 = wrong parameters, 2 = conversion error (`check`: 2 = rules broken).
 `--contrast`, `--brightness`, `--gamma`, `--saturation` prepare the picture; PETSCII: `--charset upper|lower`, `--text`,
-`--detail`, `--diffusion`, `--calm`, `--bg`. `mulej --help` lists everything.
+`--detail`, `--diffusion`, `--calm`, `--bg`, `--dither`; character sets: `--mode mc|hires`, `--max N`, `--tiles 1|2|4`,
+`--bg`, `--mc1`, `--mc2`, `--charset-png FILE`. `mulej --help` lists everything.
 The command line still offers `avg` (average of a pixel pair) for `--dir` and `--pair`; the GUI only offers left→right and right→left.
 
 ### PRG memory map
@@ -123,10 +150,10 @@ The command line still offers `avg` (average of a pixel pair) for `--dir` and `-
 | `$080D` | viewer code (sets VIC bank 0 and the mode, copies colour RAM, waits for a key, restores the text screen) |
 | `$0C00–$0FE7` | screen RAM (bitmaps: the VIC reads it there directly; PETSCII: screen codes, copied to `$0400`) |
 | `$1000–$13E7` | colour RAM data (multicolour, PETSCII), copied to `$D800` |
-| `$13E8` / `$13E9` | background / border colour |
-| `$2000–$3F3F` | bitmap |
+| `$13E8` / `$13E9` | background / border colour (character sets: `$13EA` / `$13EB` = `$D022` / `$D023`) |
+| `$2000–$3F3F` | bitmap (character sets: the character set at `$2000–$27FF`, `$D018 = $38`) |
 
-The viewer was checked in a 6502 simulator (what the VIC would show is identical to the `.kla`/`.art`/`.petmate` data),
+The viewer was checked in a 6502 simulator (what the VIC would show is identical to the `.kla`/`.art`/`.petmate`/character set data),
 not yet in VICE or on real hardware.
 
 ## Using MuleJ (for users)

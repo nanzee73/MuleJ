@@ -54,6 +54,14 @@ class PipelineTest {
         assertFalse(Pipeline.steps(Target.PETSCII).contains(Step.PIXELIZER));
         assertEquals(6, Pipeline.steps(Target.MULTICOLOR).size());
         assertEquals(5, Pipeline.steps(Target.PETSCII).size());
+        // character sets: the pixelizer only with multicolour characters
+        assertFalse(Pipeline.steps(Target.CHARSET, false).contains(Step.PIXELIZER));
+        assertTrue(Pipeline.steps(Target.CHARSET, true).contains(Step.PIXELIZER));
+        Pipeline.Params d = Pipeline.Params.defaults(Target.CHARSET);
+        assertTrue(d.skipped(Step.PIXELIZER));
+        Pipeline.Params mc = new Pipeline.Params(Target.CHARSET, Step.FRAME, null, d.adjust(), d.pair(), d.palette(),
+                d.space(), d.dither(), -1, false, d.petscii(), new CharsetConverter.Settings(true, 256, 1, -1, -1, -1), d.edits());
+        assertFalse(mc.skipped(Step.PIXELIZER));
     }
 
     @Test
@@ -98,7 +106,9 @@ class PipelineTest {
             assertEquals(200, o.prepared().getHeight());
             assertTrue(o.ok(), t.toString());
             assertNotNull(o.colours());
-            if (t == Target.PETSCII) assertNotNull(o.petscii()); else assertNotNull(o.bitmap().fileBytes());
+            if (t == Target.PETSCII) assertNotNull(o.petscii());
+            else if (t == Target.CHARSET) assertTrue(o.charset().charCount() <= 256);
+            else assertNotNull(o.bitmap().fileBytes());
             // reusing the earlier steps gives the same result
             Pipeline.Outputs again = Pipeline.run(src, p, o, Step.COLOURS);
             assertSame(o.prepared(), again.prepared());

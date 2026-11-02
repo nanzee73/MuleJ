@@ -1,13 +1,14 @@
 <html><body>
 <h1>MuleJ – User guide</h1>
 <p>MuleJ turns any picture into C64 graphics: a <b>multicolour</b> picture (Koala Painter), a <b>hires</b> picture
-(Art Studio) or a <b>PETSCII</b> text screen (Petmate) – each also as a runnable C64 program. It checks that every
+(Art Studio), a <b>PETSCII</b> text screen (Petmate) or a <b>character set</b> with screen and meta tiles for demo
+effects (KickAssembler) – each also as a runnable C64 program. It checks that every
 cell keeps the C64 colour rules and can fix the cells that don't. Everything also works on the command line.</p>
 
 <p><b>Contents</b></p>
 <ul>
 <li><a href="#quick">Quick start</a></li>
-<li><a href="#targets">Targets: multicolour, hires, PETSCII</a></li>
+<li><a href="#targets">Targets: multicolour, hires, PETSCII, character set</a></li>
 <li><a href="#chain">The chain of steps</a></li>
 <li><a href="#input">Opening pictures and "Start at"</a></li>
 <li><a href="#frame">Step 2: Frame</a></li>
@@ -15,6 +16,7 @@ cell keeps the C64 colour rules and can fix the cells that don't. Everything als
 <li><a href="#pixel">Step 4: Pixeliser</a></li>
 <li><a href="#colours">Step 5: Colours</a></li>
 <li><a href="#petscii">PETSCII settings</a></li>
+<li><a href="#charset">Character set & tiles</a></li>
 <li><a href="#result">Step 6: Result – colour check, correction, editing</a></li>
 <li><a href="#save">Saving</a></li>
 <li><a href="#projects">Projects</a></li>
@@ -25,7 +27,7 @@ cell keeps the C64 colour rules and can fix the cells that don't. Everything als
 
 <a name="quick"></a><h2>Quick start</h2>
 <ol>
-<li>Choose the <b>Target</b> at the top: Multicolour, Hires or PETSCII.</li>
+<li>Choose the <b>Target</b> at the top: Multicolour, Hires, PETSCII or Character set.</li>
 <li><b>Open picture…</b> or drop a file onto the window. MuleJ looks at the picture and decides where to start
 (see <a href="#input">Start at</a>).</li>
 <li>Go through the steps with <b>Next ▶</b> and <b>◀ Back</b>, or click a step in the bar at the top.
@@ -40,12 +42,13 @@ and/or a runnable <b>PRG</b>.</li>
 <tr><td>Multicolour</td><td>160×200, double-wide pixels</td><td>per 4×8 cell 3 colours plus one background colour shared by the whole picture</td><td>Koala Painter (.kla)</td></tr>
 <tr><td>Hires</td><td>320×200</td><td>per 8×8 cell 2 colours</td><td>Art Studio (.art)</td></tr>
 <tr><td>PETSCII</td><td>40×25 characters</td><td>per 8×8 cell one character in one colour plus one shared background colour</td><td>Petmate workspace (.petmate)</td></tr>
+<tr><td>Character set</td><td>40×25 characters, own character set</td><td>hires characters: background plus one colour per cell; multicolour characters: background, $D022, $D023 plus one colour 0–7 per cell; at most 256 (or fewer) characters</td><td>KickAssembler source + .bin files</td></tr>
 </table>
 
 <a name="chain"></a><h2>The chain of steps</h2>
 <p>The two previews show the input and the output of the current step; the settings of the step sit below them.
 Drag the divider between previews and settings to change the sizes – it is set to fit whenever you change the step.</p>
-<p><b>1 Original</b> → <b>2 Frame</b> → <b>3 Prepare</b> → <b>4 Pixeliser</b> (multicolour only) → <b>5 Colours</b>
+<p><b>1 Original</b> → <b>2 Frame</b> → <b>3 Prepare</b> → <b>4 Pixeliser</b> (multicolour bitmap or multicolour characters only) → <b>5 Colours</b>
 → <b>6 Result</b>. Each step works on the output of the step before. Change something in an early step and all later
 steps update automatically. A step that is "skipped" passes the picture through unchanged; <b>Use this step</b>
 switches it on again.</p>
@@ -82,6 +85,7 @@ to draw a new one; mouse wheel = zoom, right or middle drag = pan, double click 
 often helps.</p>
 
 <a name="pixel"></a><h2>Step 4: Pixeliser (multicolour only)</h2>
+<p>The step appears for multicolour pictures and for character sets with multicolour characters.</p>
 <p>Multicolour pixels are twice as wide, so every pair of pixels becomes one. Which pixel survives decides how thin lines
 look:</p>
 <ul>
@@ -97,7 +101,8 @@ palette editor: change colours, load .vpl/.gpl/hex files, save as .vpl.</li>
 <li><b>Matching:</b> how "similar" is measured – <i>RGB euclidean</i> (as the old c64palettizer), <i>RGB weighted</i>,
 <i>YUV</i> or <i>HSL</i>.</li>
 <li><b>Dithering</b> (Floyd-Steinberg, Atkinson, Jarvis, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8) mixes colours in fine
-patterns. <b>Strength</b> sets how much; <b>Serpentine scanning</b> avoids diagonal patterns.</li>
+patterns. <b>Strength</b> sets how much; <b>Serpentine scanning</b> avoids diagonal patterns. Dithering works for every
+target: for PETSCII and character sets it uses the colours chosen for each cell.</li>
 <li><b>Bleeding (across cells):</b> the dither error may continue into neighbouring cells – smoother, but cell edges are
 less clean.</li>
 <li><b>Background:</b> automatic (best colour) or fixed (multicolour and PETSCII).</li>
@@ -115,7 +120,34 @@ eye sees it.</p>
 <li><b>Diffusion:</b> how much of a cell's remaining error is passed on to its neighbours (good for gradients and areas).</li>
 <li><b>Calm:</b> busy characters only appear where they clearly help.</li>
 </ul>
+<p><b>Dithering</b> (in the group on the left) is optional for PETSCII too: a first pass chooses the background and, for
+every cell, the colour that mixes best with it. The picture is then dithered with just these two colours per cell, and a
+second, pixel exact pass picks the characters that follow the dither pattern – checkerboard and dot characters render
+the in-between tones. Ordered dithering (Bayer) gives calm, regular patterns; Floyd-Steinberg and Atkinson more detail.</p>
 <p>To edit a PETSCII picture further, save it as a Petmate file and open it in Petmate.</p>
+
+<a name="charset"></a><h2>Character set & tiles</h2>
+<p>The target <b>Character set</b> turns the picture into an own character set plus a screen of character codes and
+colours – the raw material for demo effects (scrollers, tile engines, char animations).</p>
+<ul>
+<li><b>Hires characters</b> (8×8 pixels): a shared background plus one colour (0–15) per cell.
+<b>Multicolour characters</b> (4×8 double-wide pixels, the pixeliser step appears): background, $D022 and $D023 for the
+whole screen plus one colour 0–7 per cell (stored in colour RAM with bit 3 set).</li>
+<li><b>Max. characters</b> (2–256): every cell first gets its own exact character. If there are more, the characters
+that look most alike are merged (k-means on the colour error), and every cell takes the colour that suits the merged
+character best. Fewer characters = more memory for code, but a coarser picture.</li>
+<li><b>Meta tiles</b> 1×1, 2×2 or 4×4: the screen is also described as a map of tiles of n×n characters; identical
+tiles are stored once. The map has ⌈40/n⌉×⌈25/n⌉ entries; places outside the screen use the blank character (code 0).
+With more than 256 tiles the map uses two bytes per entry.</li>
+<li><b>Background</b>, <b>$D022</b>, <b>$D023</b>: automatic (best colours for the picture) or fixed.</li>
+<li><b>Dithering</b> works with the colours of each cell.</li>
+</ul>
+<p><b>Save KickAssembler (.asm + .bin)…</b> writes <i>NAME.asm</i> with constants (CHAR_COUNT, MULTICOLOR, BACKGROUND,
+MC1, MC2, TILE_SIZE, TILE_COUNT, MAP_COLS, MAP_ROWS, MAP_16BIT) and labels with <code>.import binary</code>, plus
+<i>NAME_charset.bin</i>, <i>NAME_screen.bin</i>, <i>NAME_colours.bin</i> and, with tiles, <i>NAME_tiles.bin</i>,
+<i>NAME_tilecolours.bin</i> and <i>NAME_map.bin</i>. The character set is aligned to $800 as the VIC needs it.
+<b>Character set as PNG…</b> saves the characters as a picture (16 per row); <b>Save PRG…</b> shows the screen on the
+C64 (character set at $2000, screen at $0C00).</p>
 
 <a name="result"></a><h2>Step 6: Result – colour check, correction, editing</h2>
 <p>MuleJ checks all 1000 cells. "✔" means every cell keeps the rules; "✘" shows how many cells have too many colours.</p>
@@ -133,8 +165,8 @@ each conflict cell at once. Afterwards every cell can still be changed or reset 
 
 <a name="save"></a><h2>Saving</h2>
 <ul>
-<li><b>Save Koala (.kla)… / Save Art Studio (.art)… / Save Petmate…</b> – the C64 file, only once the colour check has
-passed. It is suggested in the folder of the source picture.</li>
+<li><b>Save Koala (.kla)… / Save Art Studio (.art)… / Save Petmate… / Save KickAssembler (.asm + .bin)…</b> – the C64
+file, only once the colour check has passed. It is suggested in the folder of the source picture.</li>
 <li><b>Save PRG…</b> – a runnable C64 program that shows the picture: <code>LOAD"NAME",8</code> and <code>RUN</code>;
 any key ends it.</li>
 <li><b>This step as PNG…</b> – the output of the shown step without markers, e.g. to edit it on the PC or phone and load
@@ -179,6 +211,7 @@ slider or painting a stroke counts as one step. Loading a new picture starts a n
 <tr><td><code>koala</code></td><td>multicolour bitmap → NAME.kla</td></tr>
 <tr><td><code>hires</code></td><td>hires bitmap → NAME.art</td></tr>
 <tr><td><code>petscii</code></td><td>text screen → NAME.petmate</td></tr>
+<tr><td><code>chars</code></td><td>character set + screen (+ tiles) → NAME.asm + NAME_*.bin</td></tr>
 <tr><td><code>check</code></td><td>lists the cells that break the rules of <code>--mode mc|hires</code></td></tr>
 <tr><td><code>topng</code></td><td>C64 picture or Petmate file → NAME.png</td></tr>
 </table>
@@ -186,7 +219,9 @@ slider or painting a stroke counts as one step. Loading a new picture starts a n
 <code>--fit stretch|fit|fill|none</code>, <code>--dither NAME</code>, <code>--strength N</code>, <code>--serpentine</code>,
 <code>--no-bleeding</code>, <code>--bg auto|0..15</code>, <code>--fix-clashes</code>, <code>--preview FILE.png</code>,
 <code>--prg FILE.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
-<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>.
+<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>,
+<code>--mode mc|hires</code>, <code>--max N</code>, <code>--tiles 1|2|4</code>, <code>--mc1/--mc2 auto|0..15</code>,
+<code>--charset-png FILE.png</code>.
 <code>mulej --help</code> lists all of them. The old <code>-if FILE</code> syntax of c64palettizer, c64pixelizer and
 c64koalaverter still works.</p>
 

@@ -58,6 +58,23 @@ class CliTest {
         assertTrue(Files.readString(dir.resolve("pic.petmate")).startsWith("{\"version\":2"));
         assertEquals(0, Cli.run(new String[]{"topng", dir.resolve("pic.petmate").toString(), dir.resolve("t.png").toString()}));
         assertEquals(1, Cli.run(new String[]{"petscii", in.toString(), "--charset", "klingon"}));
+        assertEquals(0, Cli.run(new String[]{"petscii", in.toString(), "-o", dir.resolve("d.petmate").toString(),
+                "--dither", "bayer4"}));
+        // character set with meta tiles: KickAssembler source + binaries
+        assertEquals(0, Cli.run(new String[]{"chars", in.toString(), "--mode", "mc", "--max", "64", "--tiles", "2",
+                "--prg", dir.resolve("c.prg").toString(), "--charset-png", dir.resolve("cs.png").toString()}));
+        String asm = Files.readString(dir.resolve("pic.asm"));
+        assertTrue(asm.contains(".const MULTICOLOR  = 1"));
+        assertTrue(Files.size(dir.resolve("pic_charset.bin")) <= 64 * 8);
+        assertEquals(1000, Files.size(dir.resolve("pic_screen.bin")));
+        assertEquals(1000, Files.size(dir.resolve("pic_colours.bin")));
+        assertEquals(20 * 13, Files.size(dir.resolve("pic_map.bin")));
+        assertTrue(Files.exists(dir.resolve("pic_tiles.bin")));
+        assertEquals(128, ImageIO.read(dir.resolve("cs.png").toFile()).getWidth());
+        assertEquals(0, Cli.run(new String[]{"chars", in.toString(), dir.resolve("h.asm").toString()}));
+        assertTrue(Files.readString(dir.resolve("h.asm")).contains(".const MULTICOLOR  = 0"));
+        assertFalse(Files.exists(dir.resolve("h_map.bin")));
+        assertEquals(1, Cli.run(new String[]{"chars", in.toString(), "--tiles", "3"}));
     }
 
     @Test

@@ -37,6 +37,9 @@ public final class Cli {
               koala       multicolor bitmap (bg + 3 colours per 4x8 cell)     -> NAME.kla  (Koala Painter)
               hires       hires bitmap (2 colours per 8x8 cell)               -> NAME.art  (Art Studio)
               petscii     text screen: characters + colours, for Petmate       -> NAME.petmate
+              chars       character set + screen (+ meta tiles) for demo effects -> NAME.asm (KickAssembler)
+                          + NAME_charset.bin, NAME_screen.bin, NAME_colours.bin
+                          (+ NAME_tiles.bin, NAME_tilecolours.bin, NAME_map.bin)
               check       colour check: list the cells that break the rules of --mode (no file written)
               topng       C64 picture or Petmate file to PNG                  -> NAME.png
                           (Koala, Art Studio, Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph,
@@ -52,19 +55,20 @@ public final class Cli {
               --fit stretch|fit|fill|none  bring pictures that are not 320x200 to 320x200 first
                                       (none = 1:1 frame of 320x200 pixels, centered); required for
                                       koala/hires/check with other sizes, optional for the others
-              --dither NAME           palettize/koala/hires: none (default), fs, atkinson, jarvis,
+              --dither NAME           palettize/koala/hires/petscii/chars: none (default), fs, atkinson, jarvis,
                                       stucki, sierra, bayer2, bayer4, bayer8
               --strength N            dither strength 0..100 (default: 80)
               --serpentine            serpentine scanning
-              --no-bleeding           koala/hires: dither error never leaves its cell
+              --no-bleeding           dither error never leaves its cell
               --dir both|l2r|r2l|avg  pixelize: which pixel of a pair survives (default: both = two files)
-              --pair l2r|r2l|avg      koala: pixel pair used for each multicolor pixel (default: l2r)
-              --mode mc|hires         check: which rules to check (default: mc)
+              --pair l2r|r2l|avg      koala, chars --mode mc: pixel pair used for each multicolor pixel (default: l2r)
+              --mode mc|hires         check: which rules to check (default: mc);
+                                      chars: multicolour or hires characters (default: hires)
               --no-palettize          koala/hires/check: every pixel must already be a palette colour
-              --bg auto|0..15         koala: background colour (default: most common colour)
+              --bg auto|0..15         koala/petscii/chars: background colour (default: automatic)
               --fix-clashes           koala/hires: correct cells with too many colours instead of failing
-              --preview FILE.png      koala/hires/petscii: also write the result as PNG
-              --prg FILE.prg          koala/hires/petscii: also write a runnable C64 program that shows it
+              --preview FILE.png      koala/hires/petscii/chars: also write the result as PNG
+              --prg FILE.prg          koala/hires/petscii/chars: also write a runnable C64 program that shows it
               --contrast N --brightness N   prepare: -100..100 (default 0)
               --gamma N --saturation N      prepare: percent (default 100)
               --charset upper|lower   petscii: character set (default: upper = upper case + graphics)
@@ -72,6 +76,11 @@ public final class Cli {
               --detail N              petscii: 0..100, pixel exact shapes vs. soft tones (default 40)
               --diffusion N           petscii: 0..100, error passed on to neighbour cells (default 40)
               --calm N                petscii: 0..100, avoid busy characters (default 30)
+              --max N                 chars: at most N characters, similar ones are merged (2..256, default 256)
+              --tiles 1|2|4           chars: meta tiles of NxN characters (default 1 = none)
+              --mc1 auto|0..15        chars --mode mc: colour of $D022 (default: automatic)
+              --mc2 auto|0..15        chars --mode mc: colour of $D023 (default: automatic)
+              --charset-png FILE.png  chars: also write the character set as picture (16 per row)
               -h, --help              this help
             """;
 
@@ -103,6 +112,10 @@ public final class Cli {
         Charset charset = pd.charset();
         boolean text = pd.textChars();
         int detailV = pd.detail(), diffusionV = pd.diffusion(), calmV = pd.calm();
+        CharsetConverter.Settings cd = CharsetConverter.Settings.defaults();
+        int maxChars = cd.maxChars(), tiles = cd.tileSize(), mc1 = -1, mc2 = -1;
+        boolean modeGiven = false;
+        Path charsetPng = null;
         try {
             for (int i = 1; i < args.length; i++) {
                 String a = args[i];
@@ -114,7 +127,7 @@ public final class Cli {
                     case "--space" -> space = ColorMatcher.Space.valueOf(next(args, ++i).toUpperCase(Locale.ROOT));
                     case "--dir" -> dir = next(args, ++i).toLowerCase(Locale.ROOT);
                     case "--pair" -> pair = direction(next(args, ++i));
-                    case "--mode" -> mode = modeByName(next(args, ++i));
+                    case "--mode" -> { mode = modeByName(next(args, ++i)); modeGiven = true; }
                     case "--no-palettize" -> palettize = false;
                     case "--bg" -> {
                         String v = next(args, ++i);
@@ -138,6 +151,17 @@ public final class Cli {
                     case "--detail" -> detailV = Integer.parseInt(next(args, ++i));
                     case "--diffusion" -> diffusionV = Integer.parseInt(next(args, ++i));
                     case "--calm" -> calmV = Integer.parseInt(next(args, ++i));
+                    case "--max" -> {
+                        maxChars = Integer.parseInt(next(args, ++i));
+                        if (maxChars < 2 || maxChars > 256) throw new IllegalArgumentException("--max must be 2..256");
+                    }
+                    case "--tiles" -> {
+                        tiles = Integer.parseInt(next(args, ++i));
+                        if (tiles != 1 && tiles != 2 && tiles != 4) throw new IllegalArgumentException("--tiles must be 1, 2 or 4");
+                    }
+                    case "--mc1" -> mc1 = colourArg("--mc1", next(args, ++i));
+                    case "--mc2" -> mc2 = colourArg("--mc2", next(args, ++i));
+                    case "--charset-png" -> charsetPng = Path.of(next(args, ++i));
                     default -> {
                         if (a.startsWith("-")) throw new IllegalArgumentException("Unknown option: " + a);
                         if (in == null) in = Path.of(a);
@@ -147,7 +171,7 @@ public final class Cli {
                 }
             }
             if (in == null) throw new IllegalArgumentException("No input file given.");
-            if (!List.of("palettize", "pixelize", "koala", "hires", "petscii", "check", "topng").contains(cmd))
+            if (!List.of("palettize", "pixelize", "koala", "hires", "petscii", "chars", "check", "topng").contains(cmd))
                 throw new IllegalArgumentException("Unknown command: " + args[0]);
             if (cmd.equals("pixelize") && !List.of("both", "l2r", "r2l", "avg").contains(dir))
                 throw new IllegalArgumentException("--dir must be both, l2r, r2l or avg");
@@ -195,7 +219,7 @@ public final class Cli {
                     }
                     src = prepared(src, adjust);
                     PetsciiImage p = PetsciiConverter.convert(src, pal, space,
-                            new PetsciiConverter.Settings(charset, text, bg, detailV, diffusionV, calmV));
+                            new PetsciiConverter.Settings(charset, text, bg, detailV, diffusionV, calmV, ds));
                     Path target = out != null ? out : Images.sibling(in, ".petmate");
                     String name = in.getFileName().toString().replaceFirst("\\.[^.]+$", "");
                     Files.writeString(target, p.toPetmate(name), java.nio.charset.StandardCharsets.UTF_8);
@@ -206,6 +230,43 @@ public final class Cli {
                     }
                     System.out.println("Conversion of " + in + " successful: " + target + " (background "
                             + p.background + ", " + p.distinctCodes() + " different characters)");
+                }
+                case "chars" -> {
+                    BufferedImage src = Images.read(in, pal);
+                    if (!(src.getWidth() == 320 && src.getHeight() == 200)) {
+                        if (ImageFitter.canTakeExactly(src)) src = ImageFitter.takeExactly(src);
+                        else if (fit != null) src = fitted(src, fit);
+                        else throw new IllegalStateException("Image resolution must be 320 x 200, not "
+                                + src.getWidth() + " x " + src.getHeight() + " (use --fit).");
+                    }
+                    src = prepared(src, adjust);
+                    boolean mc = modeGiven && mode == C64Mode.MULTICOLOR;
+                    if (mc) src = Pixelizer.pixelize(src, pair);
+                    CharsetImage c = CharsetConverter.convert(src, pal, space,
+                            new CharsetConverter.Settings(mc, maxChars, tiles, bg, mc1, mc2), ds);
+                    Path target = out != null ? out : Images.sibling(in, ".asm");
+                    String base = target.getFileName().toString().replaceFirst("\\.asm$", "");
+                    Path dirOut = target.toAbsolutePath().getParent();
+                    CharsetImage.Files f = CharsetImage.Files.of(base);
+                    Files.writeString(dirOut.resolve(base + ".asm"), c.kickAssembler(base), java.nio.charset.StandardCharsets.US_ASCII);
+                    Files.write(dirOut.resolve(f.charset()), c.charsetBytes());
+                    Files.write(dirOut.resolve(f.screen()), c.screenBytes());
+                    Files.write(dirOut.resolve(f.colours()), c.colourBytes());
+                    if (c.tileSize > 1) {
+                        Files.write(dirOut.resolve(f.tiles()), c.tileBytes());
+                        Files.write(dirOut.resolve(f.tileColours()), c.tileColourBytes());
+                        Files.write(dirOut.resolve(f.map()), c.mapBytes());
+                    }
+                    if (preview != null) Images.writePng(c.render(pal), preview);
+                    if (charsetPng != null) Images.writePng(c.renderCharset(pal), charsetPng);
+                    if (prg != null) {
+                        Files.write(prg, ViewerPrg.charset(c));
+                        System.out.println("Wrote " + prg + " (LOAD\"NAME\",8 and RUN on the C64)");
+                    }
+                    System.out.println("Conversion of " + in + " successful: " + dirOut.resolve(base + ".asm") + " ("
+                            + c.charCount() + " characters, " + c.uniqueBefore + " different before merging"
+                            + (c.tileSize > 1 ? ", " + c.tileCount() + " tiles of " + c.tileSize + "x" + c.tileSize : "")
+                            + ", background " + c.background + (mc ? ", $D022 " + c.mc1 + ", $D023 " + c.mc2 : "") + ")");
                 }
                 case "koala", "hires", "check" -> {
                     BufferedImage src = Images.read(in, pal);
@@ -322,6 +383,12 @@ public final class Cli {
             case "hires", "hi", "art" -> C64Mode.HIRES;
             default -> throw new IllegalArgumentException("Unknown mode: " + n + " (mc, hires)");
         };
+    }
+
+    static int colourArg(String option, String v) {
+        int c = v.equalsIgnoreCase("auto") ? -1 : Integer.parseInt(v);
+        if (c < -1 || c > 15) throw new IllegalArgumentException(option + " must be auto or 0..15");
+        return c;
     }
 
     static Pixelizer.Direction direction(String n) {

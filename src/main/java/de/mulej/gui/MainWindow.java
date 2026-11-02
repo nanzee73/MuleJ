@@ -102,7 +102,13 @@ public class MainWindow extends JFrame {
     private final JCheckBox textChars = I18n.tip(I18n.text(new JCheckBox(), "pet.text"), "pet.text.tip");
     private final JComboBox<Integer> petBackgroundBox = new JComboBox<>();
     private final JSlider detail = slider(0, 100, 40), diffusion = slider(0, 100, 40), calm = slider(0, 100, 30);
-    private JPanel bitmapColours, petsciiColours;
+    private JPanel bitmapColours, petsciiColours, charsetColours;
+    // character set target
+    private final JRadioButton csHires = I18n.tip(I18n.text(new JRadioButton("", true), "cs.hires"), "cs.hires.tip");
+    private final JRadioButton csMulti = I18n.tip(I18n.text(new JRadioButton(), "cs.multi"), "cs.multi.tip");
+    private final JSpinner csMax = new JSpinner(new SpinnerNumberModel(256, 2, 256, 1));
+    private final JComboBox<Integer> csTiles = new JComboBox<>(new Integer[]{1, 2, 4});
+    private final JComboBox<Integer> csBackground = new JComboBox<>(), csMc1 = new JComboBox<>(), csMc2 = new JComboBox<>();
 
     // ⑥ result
     private final JLabel checkLabel = new JLabel(" ");
@@ -119,7 +125,10 @@ public class MainWindow extends JFrame {
     private final JButton resetAll = I18n.tip(I18n.text(new JButton(), "chk.resetAll"), "chk.resetAll.tip");
     private final JButton fixAll = I18n.tip(I18n.text(new JButton(), "chk.fixAll"), "chk.fixAll.tip");
     private final JLabel petsciiInfo = new JLabel();
+    /** Text of {@link #petsciiInfo}, built again when the language changes. */
+    private Supplier<String> infoText = () -> "";
     private JPanel bitmapResult, petsciiResult;
+    private final JButton saveCharsetPngButton = I18n.tip(I18n.text(new JButton(), "save.charsetPng"), "save.charsetPng.tip");
     private final Map<Integer, int[]> cellEdits = new HashMap<>();
     private final Map<Integer, Integer> pixelEdits = new HashMap<>();
     private int selectedCell = -1;
@@ -185,7 +194,8 @@ public class MainWindow extends JFrame {
         spaceBox.setRenderer(renderer(v -> tr("space." + ((ColorMatcher.Space) v).name()), null));
         ditherBox.setRenderer(I18n.enumRenderer("dither"));
         charsetBox.setRenderer(renderer(Object::toString, null));
-        for (JComboBox<Integer> b : List.of(backgroundBox, petBackgroundBox)) {
+        csTiles.setRenderer(renderer(v -> (Integer) v == 1 ? tr("cs.tiles.none") : v + "×" + v, null));
+        for (JComboBox<Integer> b : List.of(backgroundBox, petBackgroundBox, csBackground, csMc1, csMc2)) {
             for (int i = -1; i < 16; i++) b.addItem(i);
             b.setRenderer(renderer(v -> (Integer) v < 0 ? tr("bmp.bgAuto") : v + " " + tr("color." + v), v -> (Integer) v));
         }
@@ -346,7 +356,7 @@ public class MainWindow extends JFrame {
     /** Re-arranges the step bar for the current target (④ only for multicolor) and numbers the steps. */
     private void updateStepBar() {
         stepBar.removeAll();
-        List<Step> steps = Pipeline.steps(target());
+        List<Step> steps = steps();
         Pipeline.Params p = params();
         for (int i = 0; i < steps.size(); i++) {
             Step s = steps.get(i);
@@ -413,9 +423,15 @@ public class MainWindow extends JFrame {
         // ⑤ colours
         JPanel colours = new JPanel(new GridBagLayout());
         c = gbc();
-        c.gridy = 0; c.weightx = 1; c.gridx = 0; colours.add(buildPaletteGroup(), c);   // side by side: less height
+        JPanel shared = new JPanel(new GridBagLayout());          // palette and dithering for every target
+        GridBagConstraints sc = gbc();
+        sc.gridy = 0; sc.weightx = 1; shared.add(buildPaletteGroup(), sc);
+        sc.gridy = 1; shared.add(buildDitherGroup(), sc);
+        c.gridy = 0; c.weightx = 1; c.gridx = 0; c.anchor = GridBagConstraints.NORTH;
+        colours.add(shared, c);                                   // side by side: less height
         c.gridx = 1; colours.add(bitmapColours = buildBitmapColours(), c);
         c.gridx = 2; colours.add(petsciiColours = buildPetsciiColours(), c);
+        c.gridx = 3; colours.add(charsetColours = buildCharsetColours(), c);
         addGlue(colours);
         stepPanels.put(Step.COLOURS, colours);
 
@@ -467,7 +483,8 @@ public class MainWindow extends JFrame {
         return p;
     }
 
-    private JPanel buildBitmapColours() {
+    /** Dithering: used by every target (PETSCII and character sets: with the colours chosen for each cell). */
+    private JPanel buildDitherGroup() {
         JPanel p = group("dit.group");
         GridBagConstraints c = gbc();
         c.gridy = 0; c.gridx = 0; c.gridwidth = 3; c.weightx = 1; p.add(ditherBox, c);
@@ -476,22 +493,91 @@ public class MainWindow extends JFrame {
         c.gridx = 0; c.gridwidth = 3;
         c.gridy = 2; p.add(serpentine, c);
         c.gridy = 3; p.add(bleeding, c);
-        c.gridwidth = 1;
-        c.gridy = 4; c.gridx = 0; p.add(fixedLabel("bmp.background"), c);
-        c.gridx = 1; c.gridwidth = 2; c.weightx = 1; p.add(backgroundBox, c);
-        c.gridx = 0; c.gridwidth = 3;
-        c.gridy = 5; p.add(fixClashes, c);
         addDefaultButton(p, () -> {
             ditherBox.setSelectedItem(Dither.NONE);
             strength.setValue(80);
             serpentine.setSelected(false);
             bleeding.setSelected(true);
+            changed(Step.COLOURS);
+        });
+        return p;
+    }
+
+    private JPanel buildBitmapColours() {
+        JPanel p = group("bmp.group");
+        GridBagConstraints c = gbc();
+        c.gridy = 0; c.gridx = 0; p.add(fixedLabel("bmp.background"), c);
+        c.gridx = 1; c.gridwidth = 2; c.weightx = 1; p.add(backgroundBox, c);
+        c.gridx = 0; c.gridwidth = 3;
+        c.gridy = 1; p.add(fixClashes, c);
+        addDefaultButton(p, () -> {
             backgroundBox.setSelectedIndex(0);
             fixClashes.setSelected(false);
             changed(Step.COLOURS);
         });
         return p;
     }
+
+    /** Character set target: mode, limit, meta tiles and shared colours. */
+    private JPanel buildCharsetColours() {
+        JPanel p = group("cs.group");
+        GridBagConstraints c = gbc();
+        ButtonGroup g = new ButtonGroup();
+        g.add(csHires);
+        g.add(csMulti);
+        JPanel mode = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        mode.add(csHires);
+        mode.add(Box.createHorizontalStrut(8));
+        mode.add(csMulti);
+        c.gridy = 0; c.gridx = 0; c.gridwidth = 3; c.weightx = 1; p.add(mode, c);
+        c.gridwidth = 1; c.weightx = 0;
+        c.gridy = 1; c.gridx = 0; p.add(fixedLabel("cs.max"), c);
+        I18n.tip(csMax, "cs.max.tip");
+        c.gridx = 1; c.gridwidth = 2; c.weightx = 1; p.add(csMax, c);
+        c.gridwidth = 1; c.weightx = 0;
+        c.gridy = 2; c.gridx = 0; p.add(fixedLabel("cs.tiles"), c);
+        I18n.tip(csTiles, "cs.tiles.tip");
+        c.gridx = 1; c.gridwidth = 2; c.weightx = 1; p.add(csTiles, c);
+        c.gridwidth = 1; c.weightx = 0;
+        c.gridy = 3; c.gridx = 0; p.add(fixedLabel("cs.background"), c);
+        c.gridx = 1; c.gridwidth = 2; c.weightx = 1; p.add(csBackground, c);
+        c.gridwidth = 1; c.weightx = 0;
+        c.gridy = 4; c.gridx = 0; p.add(fixedLabel("cs.mc1"), c);
+        c.gridx = 1; c.gridwidth = 2; c.weightx = 1; p.add(csMc1, c);
+        c.gridwidth = 1; c.weightx = 0;
+        c.gridy = 5; c.gridx = 0; p.add(fixedLabel("cs.mc2"), c);
+        c.gridx = 1; c.gridwidth = 2; c.weightx = 1; p.add(csMc2, c);
+        JLabel hint = new JLabel();
+        I18n.bind(() -> hint.setText(wrapped("<small>" + tr("cs.hint") + "</small>")));
+        c.gridx = 0; c.gridwidth = 3; c.gridy = 6; c.weightx = 1; p.add(hint, c);
+        addDefaultButton(p, () -> {
+            CharsetConverter.Settings d = CharsetConverter.Settings.defaults();
+            loading = true;
+            (d.multicolor() ? csMulti : csHires).setSelected(true);
+            csMax.setValue(d.maxChars());
+            csTiles.setSelectedItem(d.tileSize());
+            csBackground.setSelectedIndex(0);
+            csMc1.setSelectedIndex(0);
+            csMc2.setSelectedIndex(0);
+            loading = false;
+            charsetModeChanged();
+        });
+        return p;
+    }
+
+    private boolean csMulticolor() { return csMulti.isSelected(); }
+
+    /** The character mode decides whether the pixelizer is part of the chain. */
+    private void charsetModeChanged() {
+        if (!steps().contains(current)) current = Step.COLOURS;
+        updateEntryBox();
+        updateStepBar();
+        showStep(current);
+        changed(Step.PIXELIZER);
+    }
+
+    /** Steps of the current target (the pixelizer only with double-wide pixels). */
+    private List<Step> steps() { return Pipeline.steps(target(), target() == Target.CHARSET && csMulticolor()); }
 
     private JPanel buildPetsciiColours() {
         JPanel p = group("pet.group");
@@ -598,6 +684,7 @@ public class MainWindow extends JFrame {
         JPanel p = group("chk.group");
         GridBagConstraints c = gbc();
         petsciiInfo.setVerticalAlignment(SwingConstants.TOP);
+        I18n.bind(() -> petsciiInfo.setText(infoText.get()));
         c.gridy = 0; c.weightx = 1; p.add(petsciiInfo, c);
         return p;
     }
@@ -669,6 +756,7 @@ public class MainWindow extends JFrame {
         right.add(pngScale);
         right.add(Box.createHorizontalStrut(10));
         right.add(saveDataButton);
+        right.add(saveCharsetPngButton);
         right.add(savePrgButton);
         savePngButton.addActionListener(e -> savePng());
         saveDataButton.addActionListener(e -> saveData());
@@ -881,8 +969,12 @@ public class MainWindow extends JFrame {
             paintColour.repaint();
         });
         spaceBox.addActionListener(e -> changed(Step.COLOURS));
-        for (JComboBox<?> b : List.of(ditherBox, backgroundBox, charsetBox, petBackgroundBox))
+        for (JComboBox<?> b : List.of(ditherBox, backgroundBox, charsetBox, petBackgroundBox, csTiles, csBackground, csMc1, csMc2))
             b.addActionListener(e -> changed(Step.COLOURS));
+        csMax.addChangeListener(e -> changed(Step.COLOURS));
+        csHires.addActionListener(e -> { if (!loading) charsetModeChanged(); });
+        csMulti.addActionListener(e -> { if (!loading) charsetModeChanged(); });
+        saveCharsetPngButton.addActionListener(e -> saveCharsetPng());
         for (AbstractButton b : List.of(serpentine, bleeding, fixClashes, textChars))
             b.addActionListener(e -> changed(Step.COLOURS));
         for (JSlider s : List.of(strength, detail, diffusion, calm))
@@ -902,7 +994,11 @@ public class MainWindow extends JFrame {
     private Step entry() {
         if (source == null) return Step.FRAME;
         Step e = manualEntry != null ? manualEntry : detection != null ? detection.entry() : Step.FRAME;
-        return Pipeline.entries(target(), source).contains(e) ? e : Step.FRAME;
+        return entries().contains(e) ? e : Step.FRAME;
+    }
+
+    private List<Step> entries() {
+        return Pipeline.entries(target(), target() == Target.CHARSET && csMulticolor(), source);
     }
 
     // ---------------------------------------------------------------- project
@@ -944,6 +1040,10 @@ public class MainWindow extends JFrame {
                     Files.writeString(new File(dir, base + ".petmate").toPath(), o.petscii().toPetmate(base),
                             StandardCharsets.UTF_8);
                     Files.write(new File(dir, base + ".prg").toPath(), ViewerPrg.petscii(o.petscii()));
+                } else if (o.charset() != null) {
+                    writeCharset(o.charset(), dir.toPath(), base);
+                    Files.write(new File(dir, base + ".prg").toPath(), ViewerPrg.charset(o.charset()));
+                    Images.writePng(o.charset().renderCharset(palette()), new File(dir, base + "_charset.png").toPath());
                 } else if (o.bitmap() != null) {
                     Files.write(new File(dir, base + "." + o.bitmap().mode().extension).toPath(), o.bitmap().fileBytes());
                     Files.write(new File(dir, base + ".prg").toPath(), ViewerPrg.build(o.bitmap()));
@@ -1145,6 +1245,12 @@ public class MainWindow extends JFrame {
         m.put("pet.detail", detail.getValue());
         m.put("pet.diffusion", diffusion.getValue());
         m.put("pet.calm", calm.getValue());
+        m.put("cs.mode", csMulti.isSelected());
+        m.put("cs.max", (Integer) csMax.getValue());
+        m.put("cs.tiles", (Integer) csTiles.getSelectedItem());
+        m.put("cs.background", csBackground.getSelectedIndex());
+        m.put("cs.mc1", csMc1.getSelectedIndex());
+        m.put("cs.mc2", csMc2.getSelectedIndex());
         Map<Integer, List<Integer>> cells = new TreeMap<>();
         cellEdits.forEach((k, v) -> cells.put(k, Arrays.stream(v).boxed().toList()));
         m.put("chk.group", List.of(cells, new TreeMap<>(pixelEdits)));
@@ -1156,6 +1262,7 @@ public class MainWindow extends JFrame {
         loading = true;                                       // set everything, then recompute once
         try {
             Target t = (Target) m.get("top.target");
+            ((Boolean) m.get("cs.mode") ? csMulti : csHires).setSelected(true);
             if (t != target()) {
                 targetButtons.get(t).setSelected(true);
                 targetChanged();
@@ -1183,6 +1290,11 @@ public class MainWindow extends JFrame {
             detail.setValue((Integer) m.get("pet.detail"));
             diffusion.setValue((Integer) m.get("pet.diffusion"));
             calm.setValue((Integer) m.get("pet.calm"));
+            csMax.setValue(m.get("cs.max"));
+            csTiles.setSelectedItem(m.get("cs.tiles"));
+            csBackground.setSelectedIndex((Integer) m.get("cs.background"));
+            csMc1.setSelectedIndex((Integer) m.get("cs.mc1"));
+            csMc2.setSelectedIndex((Integer) m.get("cs.mc2"));
             List<Object> edits = (List<Object>) m.get("chk.group");
             cellEdits.clear();
             ((Map<Integer, List<Integer>>) edits.get(0)).forEach((k, v) ->
@@ -1200,16 +1312,19 @@ public class MainWindow extends JFrame {
     }
 
     private Pipeline.Params params() {
+        Ditherer.Settings dither = new Ditherer.Settings((Dither) ditherBox.getSelectedItem(), strength.getValue(),
+                serpentine.isSelected(), bleeding.isSelected());
         PetsciiConverter.Settings ps = new PetsciiConverter.Settings((Charset) charsetBox.getSelectedItem(),
                 textChars.isSelected(), (Integer) petBackgroundBox.getSelectedItem(), detail.getValue(),
-                diffusion.getValue(), calm.getValue());
+                diffusion.getValue(), calm.getValue(), dither);
+        CharsetConverter.Settings cs = new CharsetConverter.Settings(csMulticolor(), (Integer) csMax.getValue(),
+                (Integer) csTiles.getSelectedItem(), (Integer) csBackground.getSelectedItem(),
+                (Integer) csMc1.getSelectedItem(), (Integer) csMc2.getSelectedItem());
         return new Pipeline.Params(target(), entry(), fitSettings,
                 new ImageAdjust.Settings(brightness.getValue(), contrast.getValue(), gamma.getValue(), saturation.getValue()),
                 pairR2L.isSelected() ? Pixelizer.Direction.R2L : Pixelizer.Direction.L2R,
                 palette(), (ColorMatcher.Space) spaceBox.getSelectedItem(),
-                new Ditherer.Settings((Dither) ditherBox.getSelectedItem(), strength.getValue(), serpentine.isSelected(),
-                        bleeding.isSelected()),
-                (Integer) backgroundBox.getSelectedItem(), fixClashes.isSelected(), ps,
+                dither, (Integer) backgroundBox.getSelectedItem(), fixClashes.isSelected(), ps, cs,
                 new BitmapConverter.Edits(Map.copyOf(cellEdits), Map.copyOf(pixelEdits)));
     }
 
@@ -1229,7 +1344,7 @@ public class MainWindow extends JFrame {
         pixelEdits.clear();
         selectedCell = -1;
         if (source != null && manualEntry == null) detect();
-        if (!Pipeline.steps(target()).contains(current)) current = Step.COLOURS;
+        if (!steps().contains(current)) current = Step.COLOURS;
         updateEntryBox();
         updateStepBar();
         showStep(current);
@@ -1254,7 +1369,7 @@ public class MainWindow extends JFrame {
 
     /** "③ Prepare" with the number the step has for the current target. */
     private String stepLabel(Step s) {
-        int i = Pipeline.steps(target()).indexOf(s);
+        int i = steps().indexOf(s);
         return (i >= 0 ? CIRCLED.charAt(i) + " " : "") + s;
     }
 
@@ -1262,7 +1377,7 @@ public class MainWindow extends JFrame {
         loading = true;
         entryModel.removeAllElements();
         entryModel.addElement(AUTO);
-        for (Step s : Pipeline.entries(target(), source)) entryModel.addElement(s);
+        for (Step s : entries()) entryModel.addElement(s);
         entryBox.setSelectedItem(manualEntry != null && entryModel.getIndexOf(manualEntry) >= 0 ? manualEntry : AUTO);
         if (manualEntry != null && entryModel.getIndexOf(manualEntry) < 0) manualEntry = null;
         loading = false;
@@ -1334,8 +1449,26 @@ public class MainWindow extends JFrame {
         if (o.petscii() != null) {
             PetsciiImage pet = o.petscii();
             setStatus("status.petscii", secs, pet.distinctCodes(), pet.background);
-            petsciiInfo.setText(wrapped(tr("pet.result", pet.distinctCodes(), pet.background, tr("color." + pet.background))
-                    + "<br><br>" + tr("pet.result.edit")));
+            infoText = () -> wrapped(tr("pet.result", pet.distinctCodes(), pet.background, tr("color." + pet.background))
+                    + "<br><br>" + tr("pet.result.edit"));
+            petsciiInfo.setText(infoText.get());
+            return;
+        }
+        if (o.charset() != null) {
+            CharsetImage c = o.charset();
+            setStatus("status.charset", secs, c.charCount(), c.uniqueBefore);
+            int max = (Integer) csMax.getValue();
+            infoText = () -> {
+                String info = tr("cs.result", c.charCount(), max, c.uniqueBefore) + "<br>"
+                        + (c.multicolor ? tr("cs.resultMc", c.background, tr("color." + c.background), c.mc1,
+                        tr("color." + c.mc1), c.mc2, tr("color." + c.mc2))
+                        : tr("cs.resultHires", c.background, tr("color." + c.background)));
+                if (c.tileSize > 1)
+                    info += "<br>" + tr("cs.resultTiles", c.tileCount(), c.tileSize, c.tileSize, c.mapCols, c.mapRows)
+                            + (c.map16() ? " " + tr("cs.result16") : "");
+                return wrapped(info + "<br><br>" + tr("cs.result.use"));
+            };
+            petsciiInfo.setText(infoText.get());
             return;
         }
         BitmapConverter.Result r = o.bitmap();
@@ -1364,7 +1497,7 @@ public class MainWindow extends JFrame {
     }
 
     private void stepBy(int d) {
-        List<Step> steps = Pipeline.steps(target());
+        List<Step> steps = steps();
         int i = steps.indexOf(current) + d;
         if (i >= 0 && i < steps.size()) showStep(steps.get(i));
     }
@@ -1452,21 +1585,28 @@ public class MainWindow extends JFrame {
         for (Step s : Step.values()) setEnabledDeep(stepPanels.get(s), has);
         for (JPanel p : skippedPanels.values()) setEnabledDeep(p, has);
         cropEditor.enabledChanged();
-        boolean pet = t == Target.PETSCII;
-        bitmapColours.setVisible(!pet);
+        boolean pet = t == Target.PETSCII, chars = t == Target.CHARSET, bitmap = t.mode != null;
+        bitmapColours.setVisible(bitmap);
         petsciiColours.setVisible(pet);
-        bitmapResult.setVisible(!pet);
-        petsciiResult.setVisible(pet);
-        if (has && !pet) {
+        charsetColours.setVisible(chars);
+        bitmapResult.setVisible(bitmap);
+        petsciiResult.setVisible(!bitmap);
+        if (has) {
             boolean dithering = ditherBox.getSelectedItem() != Dither.NONE && strength.getValue() > 0;
-            fixClashes.setEnabled(!dithering);
-            backgroundBox.setEnabled(t == Target.MULTICOLOR);
             bleeding.setEnabled(dithering);
             serpentine.setEnabled(dithering);
             strength.setEnabled(ditherBox.getSelectedItem() != Dither.NONE);
-            paintColour.setEnabled(toolPaint.isSelected());
+            if (bitmap) {
+                fixClashes.setEnabled(!dithering);
+                backgroundBox.setEnabled(t == Target.MULTICOLOR);
+                paintColour.setEnabled(toolPaint.isSelected());
+            }
+            if (chars) {
+                csMc1.setEnabled(csMulticolor());
+                csMc2.setEnabled(csMulticolor());
+            }
         }
-        List<Step> steps = Pipeline.steps(t);
+        List<Step> steps = steps();
         int i = steps.indexOf(current);
         backButton.setEnabled(has && i > 0);
         nextButton.setEnabled(has && i < steps.size() - 1);
@@ -1477,13 +1617,15 @@ public class MainWindow extends JFrame {
         boolean result = current == Step.RESULT;
         saveDataButton.setVisible(result);
         savePrgButton.setVisible(result);
-        saveDataButton.setText(tr(pet ? "save.petmate" : t == Target.HIRES ? "save.art" : "save.kla"));
-        saveDataButton.setToolTipText(tr(pet ? "save.petmate.tip" : "save.data.tip"));
+        saveCharsetPngButton.setVisible(result && chars);
+        saveDataButton.setText(tr(pet ? "save.petmate" : chars ? "save.asm" : t == Target.HIRES ? "save.art" : "save.kla"));
+        saveDataButton.setToolTipText(tr(pet ? "save.petmate.tip" : chars ? "save.asm.tip" : "save.data.tip"));
         boolean ok = has && o != null && o.ok() && outputParams != null && outputParams.target() == t;
         saveDataButton.setEnabled(ok);
         savePrgButton.setEnabled(ok);
-        rightPanel.setPixelListener(has && current == Step.RESULT && !pet ? this::resultClicked : null);
-        rightPanel.setToolTipText(tr(current == Step.RESULT && !pet ? "preview.edit.tip" : "preview.tip"));
+        saveCharsetPngButton.setEnabled(ok && o.charset() != null);
+        rightPanel.setPixelListener(has && current == Step.RESULT && bitmap ? this::resultClicked : null);
+        rightPanel.setToolTipText(tr(current == Step.RESULT && bitmap ? "preview.edit.tip" : "preview.tip"));
     }
 
     // ================================================================ manual correction (bitmaps)
@@ -1754,7 +1896,8 @@ public class MainWindow extends JFrame {
         BufferedImage img = previewImage();
         if (img == null) return;
         int f = (Integer) pngScale.getSelectedItem();
-        String suffix = current == Step.RESULT && target() == Target.PETSCII ? "petscii" : PNG_SUFFIX.get(current);
+        String suffix = current == Step.RESULT && target() == Target.PETSCII ? "petscii"
+                : current == Step.RESULT && target() == Target.CHARSET ? "chars" : PNG_SUFFIX.get(current);
         Path p = chooseFile("dlg.savePng.title", "filter.png", "png",
                 sourceBase() + "_" + suffix + (f > 1 ? "_x" + f : "") + ".png");
         if (p == null) return;
@@ -1778,6 +1921,12 @@ public class MainWindow extends JFrame {
                 if (p == null) return;
                 Files.writeString(p, o.petscii().toPetmate(sourceBase()), StandardCharsets.UTF_8);
                 setStatus("status.saved", p.getFileName());
+            } else if (o.charset() != null) {
+                Path p = chooseFile("dlg.saveAsm.title", "filter.asm", "asm", sourceBase() + ".asm");
+                if (p == null) return;
+                String base = p.getFileName().toString().replaceFirst("\\.asm$", "");
+                int n = writeCharset(o.charset(), p.toAbsolutePath().getParent(), base);
+                setStatus("status.savedAsm", p.getFileName(), n);
             } else {
                 C64Mode m = o.bitmap().mode();
                 Path p = chooseFile("dlg.saveData.title", m == C64Mode.HIRES ? "filter.art" : "filter.kla", m.extension,
@@ -1800,8 +1949,41 @@ public class MainWindow extends JFrame {
         Path p = chooseFile("dlg.savePrg.title", "filter.prg", "prg", sourceBase() + ".prg");
         if (p == null) return;
         try {
-            Files.write(p, o.petscii() != null ? ViewerPrg.petscii(o.petscii()) : ViewerPrg.build(o.bitmap()));
+            Files.write(p, o.petscii() != null ? ViewerPrg.petscii(o.petscii())
+                    : o.charset() != null ? ViewerPrg.charset(o.charset()) : ViewerPrg.build(o.bitmap()));
             setStatus("status.savedPrg", p.getFileName());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, tr("err.write", ex.getMessage()), App.NAME, JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** KickAssembler source plus binary parts; returns the number of binary files. */
+    private static int writeCharset(CharsetImage c, Path dir, String base) throws java.io.IOException {
+        CharsetImage.Files f = CharsetImage.Files.of(base);
+        Files.writeString(dir.resolve(base + ".asm"), c.kickAssembler(base), StandardCharsets.US_ASCII);
+        Files.write(dir.resolve(f.charset()), c.charsetBytes());
+        Files.write(dir.resolve(f.screen()), c.screenBytes());
+        Files.write(dir.resolve(f.colours()), c.colourBytes());
+        if (c.tileSize <= 1) return 3;
+        Files.write(dir.resolve(f.tiles()), c.tileBytes());
+        Files.write(dir.resolve(f.tileColours()), c.tileColourBytes());
+        Files.write(dir.resolve(f.map()), c.mapBytes());
+        return 6;
+    }
+
+    /** The character set as picture (16 characters per row), enlarged by the chosen factor. */
+    private void saveCharsetPng() {
+        Pipeline.Outputs o = outputs;
+        if (o == null || o.charset() == null) return;
+        int f = (Integer) pngScale.getSelectedItem();
+        Path p = chooseFile("dlg.savePng.title", "filter.png", "png",
+                sourceBase() + "_charset" + (f > 1 ? "_x" + f : "") + ".png");
+        if (p == null) return;
+        try {
+            BufferedImage img = o.charset().renderCharset(palette());
+            Images.writePng(f == 1 ? img : ImageFitter.scale(img, img.getWidth() * f, img.getHeight() * f,
+                    ImageFitter.Filter.NEAREST), p);
+            setStatus("status.saved", p.getFileName());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, tr("err.write", ex.getMessage()), App.NAME, JOptionPane.ERROR_MESSAGE);
         }
