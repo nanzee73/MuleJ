@@ -99,7 +99,7 @@ The picture becomes an own character set plus a 40×25 screen of character codes
   identical tiles stored once, a 16-bit map if there are more than 256 tiles.
 * Optional dithering with the colours of each cell.
 
-Saving writes **KickAssembler** source (`NAME.asm`: `.const` values, `.align $800`, labels with `.import binary`) plus
+Saving (*Save character set ▾*: everything, only the character set, or only the mapping) writes **KickAssembler** source (`NAME.asm`: `.const` values, `.align $800`, labels with `.import binary`) plus
 `NAME_charset.bin`, `NAME_screen.bin`, `NAME_colours.bin` and with tiles `NAME_tiles.bin`, `NAME_tilecolours.bin`,
 `NAME_map.bin`; the character set also as PNG (16 per row) and the screen as PRG.
 
@@ -139,7 +139,7 @@ mulej --help
 Exit codes as before: 0 = OK, 1 = wrong parameters, 2 = conversion error (`check`: 2 = rules broken).
 `--contrast`, `--brightness`, `--gamma`, `--saturation` prepare the picture; PETSCII: `--charset upper|lower`, `--text`,
 `--detail`, `--diffusion`, `--calm`, `--bg`, `--dither`; character sets: `--mode mc|hires`, `--max N`, `--tiles 1|2|4`,
-`--bg`, `--mc1`, `--mc2`, `--charset-png FILE`. `mulej --help` lists everything.
+`--bg`, `--mc1`, `--mc2`, `--charset-png FILE`, `--only charset|map`. `mulej --help` lists everything.
 The command line still offers `avg` (average of a pixel pair) for `--dir` and `--pair`; the GUI only offers left→right and right→left.
 
 ### PRG memory map

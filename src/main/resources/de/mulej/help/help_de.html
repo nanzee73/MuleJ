@@ -147,10 +147,12 @@ bekommen das leere Zeichen (Code 0). Bei mehr als 256 Tiles braucht die Karte zw
 <li><b>Hintergrund</b>, <b>$D022</b>, <b>$D023</b>: automatisch (beste Farben für das Bild) oder fest.</li>
 <li><b>Dithering</b> arbeitet mit den Farben jeder Zelle.</li>
 </ul>
-<p><b>KickAssembler speichern (.asm + .bin)…</b> schreibt <i>NAME.asm</i> mit Konstanten (CHAR_COUNT, MULTICOLOR,
+<p><b>Zeichensatz speichern ▾</b> bietet drei Möglichkeiten. <b>Alles</b> schreibt <i>NAME.asm</i> mit Konstanten (CHAR_COUNT, MULTICOLOR,
 BACKGROUND, MC1, MC2, TILE_SIZE, TILE_COUNT, MAP_COLS, MAP_ROWS, MAP_16BIT) und Labels mit <code>.import binary</code>,
 dazu <i>NAME_charset.bin</i>, <i>NAME_screen.bin</i>, <i>NAME_colours.bin</i> und mit Tiles <i>NAME_tiles.bin</i>,
 <i>NAME_tilecolours.bin</i> und <i>NAME_map.bin</i>. Der Zeichensatz wird auf $800 ausgerichtet, wie der VIC es braucht.
+<b>Nur Zeichensatz</b> schreibt nur <i>NAME_charset.bin</i>; <b>Nur Mapping</b> schreibt Bildschirm und Farben (mit
+Tiles auch Tiles, Tile-Farben und Karte) – praktisch, wenn der Code, der sie benutzt, schon existiert.
 <b>Zeichensatz als PNG…</b> speichert die Zeichen als Bild (16 pro Zeile); <b>PRG speichern…</b> zeigt den Bildschirm
 auf dem C64 (Zeichensatz bei $2000, Bildschirm bei $0C00).</p>
 
@@ -173,8 +175,8 @@ zurücksetzen.</li>
 
 <a name="save"></a><h2>Speichern</h2>
 <ul>
-<li><b>Koala speichern (.kla)… / Art Studio speichern (.art)… / Petmate speichern… / KickAssembler speichern
-(.asm + .bin)…</b> – die C64-Datei, erst wenn der Farbcheck bestanden ist. Vorgeschlagen wird der Ordner des Quellbildes.</li>
+<li><b>Koala speichern (.kla)… / Art Studio speichern (.art)… / Petmate speichern… / Zeichensatz
+speichern ▾</b> – die C64-Datei, erst wenn der Farbcheck bestanden ist. Vorgeschlagen wird der Ordner des Quellbildes.</li>
 <li><b>PRG speichern…</b> – ein startbares C64-Programm, das das Bild zeigt: <code>LOAD"NAME",8</code> und <code>RUN</code>;
 eine beliebige Taste beendet es.</li>
 <li><b>Diesen Schritt als PNG…</b> – die Ausgabe des gezeigten Schritts ohne Markierungen, z. B. um sie am PC oder Handy
@@ -193,7 +195,8 @@ Ergebnissen, die bei jedem Speichern neu geschrieben werden. Gibt es den Ordner 
 (Strg+Umschalt+O), <b>Zuletzt geöffnet</b> (die letzten 10 Projekte), <b>Speichern unter</b> (Strg+Umschalt+S),
 <b>Projekt schließen</b> (Strg+W) und <b>Projektordner öffnen</b>. Solange etwas ungespeichert ist, zeigt der Titel
 ein „•“; bevor Änderungen verloren gingen (Schließen, Beenden, anderes Bild oder Projekt öffnen), fragt das Programm,
-ob gespeichert werden soll.</p>
+ob gespeichert werden soll. Ein neu geöffnetes Bild beginnt mit allen Einstellungen auf Standard (nur das Ziel
+bleibt); <i>Abbrechen</i> in dieser Rückfrage lässt alles, wie es war.</p>
 
 <a name="preview"></a><h2>Vorschau, Zoomen und Verschieben</h2>
 <ul>
@@ -201,6 +204,8 @@ ob gespeichert werden soll.</p>
 <b>4×</b> (4 Bildschirmpixel pro Bildpixel).</li>
 <li><b>Koppeln</b> zoomt und verschiebt beide Vorschauen gemeinsam, <b>Raster</b> zeigt beim Hineinzoomen Pixel- und
 8×8-Zellenlinien, <b>PAL</b> zeigt 320×200-Bilder im Seitenverhältnis eines PAL-Monitors.</li>
+<li><b>Endergebnis</b> (rechte Vorschau): zeigt das Endergebnis statt der Ausgabe des aktuellen Schritts – so siehst du
+sofort, was eine Einstellung in einem frühen Schritt am Ende bewirkt.</li>
 <li>Jede Gruppe hat eine Schaltfläche <b>Standard</b>. Regler: Pfeile verstellen um 1, die Markierung zeigt den
 Standardwert, Doppelklick setzt zurück.</li>
 <li>Sprache: Menü <b>Sprache</b>. <i>Systemsprache</i> (Standard) folgt deinem Rechner – Englisch, wenn der weder
@@ -232,7 +237,7 @@ geöffnetes Bild beginnt einen neuen Verlauf.</p>
 <code>--prg DATEI.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
 <code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>,
 <code>--mode mc|hires</code>, <code>--max N</code>, <code>--tiles 1|2|4</code>, <code>--mc1/--mc2 auto|0..15</code>,
-<code>--charset-png DATEI.png</code>.
+<code>--charset-png DATEI.png</code>, <code>--only charset|map</code>.
 <code>mulej --help</code> listet alle auf. Die alte <code>-if DATEI</code>-Schreibweise von c64palettizer, c64pixelizer
 und c64koalaverter funktioniert weiterhin.</p>
 

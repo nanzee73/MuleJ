@@ -75,6 +75,11 @@ class CliTest {
         assertTrue(Files.readString(dir.resolve("h.asm")).contains(".const MULTICOLOR  = 0"));
         assertFalse(Files.exists(dir.resolve("h_map.bin")));
         assertEquals(1, Cli.run(new String[]{"chars", in.toString(), "--tiles", "3"}));
+        assertEquals(0, Cli.run(new String[]{"chars", in.toString(), dir.resolve("only.asm").toString(), "--only", "charset"}));
+        assertTrue(Files.exists(dir.resolve("only_charset.bin")));
+        assertFalse(Files.exists(dir.resolve("only.asm")));
+        assertFalse(Files.exists(dir.resolve("only_screen.bin")));
+        assertEquals(1, Cli.run(new String[]{"chars", in.toString(), "--only", "sprites"}));
     }
 
     @Test

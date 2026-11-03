@@ -141,6 +141,8 @@ public class MainWindow extends JFrame {
     private final JCheckBox linkViews = I18n.tip(I18n.text(new JCheckBox("", true), "view.link"), "view.link.tip");
     private final JCheckBox showGrid = I18n.tip(I18n.text(new JCheckBox("", true), "view.grid"), "view.grid.tip");
     private final JCheckBox palAspect = I18n.tip(I18n.text(new JCheckBox("", true), "view.pal"), "view.pal.tip");
+    /** Right preview: the final result instead of the output of the shown step. */
+    private final JCheckBox showFinal = I18n.tip(I18n.text(new JCheckBox(), "view.showFinal"), "view.showFinal.tip");
 
     // ---------------------------------------------------------------- bottom
     private final JButton backButton = I18n.text(new JButton(), "nav.back");
@@ -703,6 +705,7 @@ public class MainWindow extends JFrame {
             rightPanel.setShowGrid(showGrid.isSelected());
         });
         palAspect.addActionListener(e -> updateAspect());
+        showFinal.addActionListener(e -> updateViews());
         return p;
     }
 
@@ -730,6 +733,9 @@ public class MainWindow extends JFrame {
             tools.add(linkViews);
             tools.add(showGrid);
             tools.add(palAspect);
+        } else {
+            tools.add(Box.createHorizontalStrut(6));
+            tools.add(showFinal);
         }
         needPicture.add(tools);
         header.add(tools, BorderLayout.CENTER);
@@ -1041,7 +1047,7 @@ public class MainWindow extends JFrame {
                             StandardCharsets.UTF_8);
                     Files.write(new File(dir, base + ".prg").toPath(), ViewerPrg.petscii(o.petscii()));
                 } else if (o.charset() != null) {
-                    writeCharset(o.charset(), dir.toPath(), base);
+                    o.charset().write(dir.toPath(), base, CharsetImage.Part.ALL);
                     Files.write(new File(dir, base + ".prg").toPath(), ViewerPrg.charset(o.charset()));
                     Images.writePng(o.charset().renderCharset(palette()), new File(dir, base + "_charset.png").toPath());
                 } else if (o.bitmap() != null) {
@@ -1526,10 +1532,17 @@ public class MainWindow extends JFrame {
                 case RESULT -> { left = o != null ? o.pixelized() : null; right = o != null ? resultImage(o) : null; lt = "view.template"; }
             }
         }
+        // the final result instead of the step's output (the result step and the original already show it)
+        boolean finalView = showFinal.isSelected() && source != null && s != Step.ORIGINAL && s != Step.RESULT;
+        if (finalView) {
+            right = o != null ? o.colours() : null;
+            rt = "view.final";
+        }
         leftPanel.setImage(left);
         rightPanel.setImage(right);
         leftTitle.setText(tr(lt, stepLabel(s)));
-        rightTitle.setText(tr(rt, stepLabel(s)) + (source != null && params().skipped(s) ? " " + tr("step.skippedShort") : ""));
+        rightTitle.setText(tr(rt, stepLabel(s))
+                + (source != null && params().skipped(s) && !finalView ? " " + tr("step.skippedShort") : ""));
         updateAspect();
         if (linkViews.isSelected() && sameSize() && !crop) rightPanel.copyViewFrom(leftPanel);
     }
@@ -1623,12 +1636,13 @@ public class MainWindow extends JFrame {
         saveDataButton.setVisible(result);
         savePrgButton.setVisible(result);
         saveCharsetPngButton.setVisible(result && chars);
-        saveDataButton.setText(tr(pet ? "save.petmate" : chars ? "save.asm" : t == Target.HIRES ? "save.art" : "save.kla"));
-        saveDataButton.setToolTipText(tr(pet ? "save.petmate.tip" : chars ? "save.asm.tip" : "save.data.tip"));
+        saveDataButton.setText(tr(pet ? "save.petmate" : chars ? "save.charsetMenu" : t == Target.HIRES ? "save.art" : "save.kla"));
+        saveDataButton.setToolTipText(tr(pet ? "save.petmate.tip" : chars ? "save.charsetMenu.tip" : "save.data.tip"));
         boolean ok = has && o != null && o.ok() && outputParams != null && outputParams.target() == t;
         saveDataButton.setEnabled(ok);
         savePrgButton.setEnabled(ok);
         saveCharsetPngButton.setEnabled(ok && o.charset() != null);
+        showFinal.setEnabled(has && current != Step.ORIGINAL && current != Step.RESULT);   // those show it anyway
         rightPanel.setPixelListener(has && current == Step.RESULT && bitmap ? this::resultClicked : null);
         rightPanel.setToolTipText(tr(current == Step.RESULT && bitmap ? "preview.edit.tip" : "preview.tip"));
     }
@@ -1812,21 +1826,35 @@ public class MainWindow extends JFrame {
         if (f != null) loadInput(f);
     }
 
-    /** Opens a picture chosen by the user: asks about unsaved changes, starts a new project. */
+    /**
+     * Opens a picture chosen by the user: asks about unsaved changes (cancel keeps everything), starts a new project
+     * with all settings at their defaults – only the chosen target is kept.
+     */
     void loadInput(File f) {
         if (!session.confirmDiscard()) return;
-        if (loadPicture(f)) session.pictureLoaded();
+        if (loadPicture(f, true)) session.pictureLoaded();
+    }
+
+    /** All settings and edits back to the start values, except the target. */
+    private void resetSettings() {
+        Map<String, Object> d = new LinkedHashMap<>(defaults);
+        d.put("top.target", target());
+        restoreState(d);
     }
 
     /** Loads a picture, finds out where the chain starts and shows that step; false if it cannot be read. */
-    private boolean loadPicture(File f) {
+    private boolean loadPicture(File f) { return loadPicture(f, false); }
+
+    /** @param reset all settings to their defaults first (only once the picture could be read) */
+    private boolean loadPicture(File f, boolean reset) {
         BufferedImage img;
         try {
-            img = Images.read(f.toPath(), palette());
+            img = Images.read(f.toPath(), reset ? (Palette) defaults.get("pal.group") : palette());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, tr("err.read", ex.getMessage()), App.NAME, JOptionPane.ERROR_MESSAGE);
             return false;
         }
+        if (reset) resetSettings();
         FileDialogs.rememberDir("input", f);
         loading = true;
         Path p = f.toPath();
@@ -1927,11 +1955,7 @@ public class MainWindow extends JFrame {
                 Files.writeString(p, o.petscii().toPetmate(sourceBase()), StandardCharsets.UTF_8);
                 setStatus("status.saved", p.getFileName());
             } else if (o.charset() != null) {
-                Path p = chooseFile("dlg.saveAsm.title", "filter.asm", "asm", sourceBase() + ".asm");
-                if (p == null) return;
-                String base = p.getFileName().toString().replaceFirst("\\.asm$", "");
-                int n = writeCharset(o.charset(), p.toAbsolutePath().getParent(), base);
-                setStatus("status.savedAsm", p.getFileName(), n);
+                showCharsetSaveMenu();
             } else {
                 C64Mode m = o.bitmap().mode();
                 Path p = chooseFile("dlg.saveData.title", m == C64Mode.HIRES ? "filter.art" : "filter.kla", m.extension,
@@ -1962,19 +1986,39 @@ public class MainWindow extends JFrame {
         }
     }
 
-    /** KickAssembler source plus binary parts; returns the number of binary files. */
-    private static int writeCharset(CharsetImage c, Path dir, String base) throws java.io.IOException {
-        CharsetImage.Files f = CharsetImage.Files.of(base);
-        base = CharsetImage.safeName(base);
-        Files.writeString(dir.resolve(base + ".asm"), c.kickAssembler(base), StandardCharsets.US_ASCII);
-        Files.write(dir.resolve(f.charset()), c.charsetBytes());
-        Files.write(dir.resolve(f.screen()), c.screenBytes());
-        Files.write(dir.resolve(f.colours()), c.colourBytes());
-        if (c.tileSize <= 1) return 3;
-        Files.write(dir.resolve(f.tiles()), c.tileBytes());
-        Files.write(dir.resolve(f.tileColours()), c.tileColourBytes());
-        Files.write(dir.resolve(f.map()), c.mapBytes());
-        return 6;
+    /**
+     * Character set export: everything (KickAssembler + .bin), only the character set or only the mapping.
+     * The file chosen in the dialog gives the base name; the parts are written next to it.
+     */
+    private void saveCharsetPart(CharsetImage.Part part) {
+        Pipeline.Outputs o = outputs;
+        if (o == null || o.charset() == null) return;
+        String base = CharsetImage.safeName(sourceBase());
+        Path p = switch (part) {
+            case ALL -> chooseFile("dlg.saveAsm.title", "filter.asm", "asm", base + ".asm");
+            case CHARSET -> chooseFile("dlg.saveCharset.title", "filter.bin", "bin", base + "_charset.bin");
+            case MAP -> chooseFile("dlg.saveMap.title", "filter.bin", "bin", base + "_screen.bin");
+        };
+        if (p == null) return;
+        try {
+            List<String> files = o.charset().write(p.toAbsolutePath().getParent(),
+                    CharsetImage.baseOf(p.getFileName().toString()), part);
+            setStatus("status.savedFiles", String.join(", ", files));
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, tr("err.write", ex.getMessage()), App.NAME, JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Menu of the save button for character sets. */
+    private void showCharsetSaveMenu() {
+        JPopupMenu m = new JPopupMenu();
+        for (CharsetImage.Part part : CharsetImage.Part.values()) {
+            JMenuItem item = new JMenuItem(tr("save.part." + part.name()));
+            item.setToolTipText(tr("save.part." + part.name() + ".tip"));
+            item.addActionListener(e -> saveCharsetPart(part));
+            m.add(item);
+        }
+        m.show(saveDataButton, 0, saveDataButton.getHeight());
     }
 
     /** The character set as picture (16 characters per row), enlarged by the chosen factor. */

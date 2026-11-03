@@ -160,6 +160,57 @@ public final class CharsetImage {
         }
     }
 
+    /** What to export. */
+    public enum Part {
+        /** KickAssembler source plus every binary part. */
+        ALL,
+        /** Only the character set (NAME_charset.bin). */
+        CHARSET,
+        /** Only the mapping: screen and colours, with tiles also tiles, tile colours and map. */
+        MAP
+    }
+
+    /**
+     * Base name from a file name the user chose: "pic.asm", "pic_charset.bin", "pic_screen.bin" and "pic.bin" all give
+     * "pic" (made safe with {@link #safeName}).
+     */
+    public static String baseOf(String fileName) {
+        String n = fileName.replaceFirst("(?i)\\.(asm|bin)$", "");
+        n = n.replaceFirst("_(charset|screen|colours|tiles|tilecolours|map)$", "");
+        return safeName(n);
+    }
+
+    /** Writes the chosen part into {@code dir}; returns the names of the written files. */
+    public java.util.List<String> write(java.nio.file.Path dir, String base, Part part) throws java.io.IOException {
+        base = safeName(base);
+        Files f = Files.of(base);
+        java.util.List<String> written = new java.util.ArrayList<>();
+        if (part == Part.ALL) {
+            java.nio.file.Files.writeString(dir.resolve(base + ".asm"), kickAssembler(base),
+                    java.nio.charset.StandardCharsets.US_ASCII);
+            written.add(base + ".asm");
+        }
+        if (part != Part.MAP) {
+            java.nio.file.Files.write(dir.resolve(f.charset()), charsetBytes());
+            written.add(f.charset());
+        }
+        if (part != Part.CHARSET) {
+            java.nio.file.Files.write(dir.resolve(f.screen()), screenBytes());
+            java.nio.file.Files.write(dir.resolve(f.colours()), colourBytes());
+            written.add(f.screen());
+            written.add(f.colours());
+            if (tileSize > 1) {
+                java.nio.file.Files.write(dir.resolve(f.tiles()), tileBytes());
+                java.nio.file.Files.write(dir.resolve(f.tileColours()), tileColourBytes());
+                java.nio.file.Files.write(dir.resolve(f.map()), mapBytes());
+                written.add(f.tiles());
+                written.add(f.tileColours());
+                written.add(f.map());
+            }
+        }
+        return written;
+    }
+
     /** KickAssembler source (plain ASCII) that defines the constants and imports the binary parts. */
     public String kickAssembler(String base) {
         base = safeName(base);

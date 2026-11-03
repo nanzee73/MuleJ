@@ -81,6 +81,8 @@ public final class Cli {
               --mc1 auto|0..15        chars --mode mc: colour of $D022 (default: automatic)
               --mc2 auto|0..15        chars --mode mc: colour of $D023 (default: automatic)
               --charset-png FILE.png  chars: also write the character set as picture (16 per row)
+              --only charset|map|all  chars: write only the character set (NAME_charset.bin) or only the
+                                      mapping (screen, colours, tiles, map .bin); default all + NAME.asm
               -h, --help              this help
             """;
 
@@ -116,6 +118,7 @@ public final class Cli {
         int maxChars = cd.maxChars(), tiles = cd.tileSize(), mc1 = -1, mc2 = -1;
         boolean modeGiven = false;
         Path charsetPng = null;
+        CharsetImage.Part only = CharsetImage.Part.ALL;
         try {
             for (int i = 1; i < args.length; i++) {
                 String a = args[i];
@@ -162,6 +165,15 @@ public final class Cli {
                     case "--mc1" -> mc1 = colourArg("--mc1", next(args, ++i));
                     case "--mc2" -> mc2 = colourArg("--mc2", next(args, ++i));
                     case "--charset-png" -> charsetPng = Path.of(next(args, ++i));
+                    case "--only" -> {
+                        String v = next(args, ++i).toLowerCase(Locale.ROOT);
+                        only = switch (v) {
+                            case "charset", "chars" -> CharsetImage.Part.CHARSET;
+                            case "map", "mapping" -> CharsetImage.Part.MAP;
+                            case "all" -> CharsetImage.Part.ALL;
+                            default -> throw new IllegalArgumentException("--only must be charset, map or all");
+                        };
+                    }
                     default -> {
                         if (a.startsWith("-")) throw new IllegalArgumentException("Unknown option: " + a);
                         if (in == null) in = Path.of(a);
@@ -245,25 +257,16 @@ public final class Cli {
                     CharsetImage c = CharsetConverter.convert(src, pal, space,
                             new CharsetConverter.Settings(mc, maxChars, tiles, bg, mc1, mc2), ds);
                     Path target = out != null ? out : Images.sibling(in, ".asm");
-                    String base = CharsetImage.safeName(target.getFileName().toString().replaceFirst("\\.asm$", ""));
+                    String base = CharsetImage.baseOf(target.getFileName().toString());
                     Path dirOut = target.toAbsolutePath().getParent();
-                    CharsetImage.Files f = CharsetImage.Files.of(base);
-                    Files.writeString(dirOut.resolve(base + ".asm"), c.kickAssembler(base), java.nio.charset.StandardCharsets.US_ASCII);
-                    Files.write(dirOut.resolve(f.charset()), c.charsetBytes());
-                    Files.write(dirOut.resolve(f.screen()), c.screenBytes());
-                    Files.write(dirOut.resolve(f.colours()), c.colourBytes());
-                    if (c.tileSize > 1) {
-                        Files.write(dirOut.resolve(f.tiles()), c.tileBytes());
-                        Files.write(dirOut.resolve(f.tileColours()), c.tileColourBytes());
-                        Files.write(dirOut.resolve(f.map()), c.mapBytes());
-                    }
+                    List<String> written = c.write(dirOut, base, only);
                     if (preview != null) Images.writePng(c.render(pal), preview);
                     if (charsetPng != null) Images.writePng(c.renderCharset(pal), charsetPng);
                     if (prg != null) {
                         Files.write(prg, ViewerPrg.charset(c));
                         System.out.println("Wrote " + prg + " (LOAD\"NAME\",8 and RUN on the C64)");
                     }
-                    System.out.println("Conversion of " + in + " successful: " + dirOut.resolve(base + ".asm") + " ("
+                    System.out.println("Conversion of " + in + " successful: " + String.join(", ", written) + " in " + dirOut + " ("
                             + c.charCount() + " characters, " + c.uniqueBefore + " different before merging"
                             + (c.tileSize > 1 ? ", " + c.tileCount() + " tiles of " + c.tileSize + "x" + c.tileSize : "")
                             + ", background " + c.background + (mc ? ", $D022 " + c.mc1 + ", $D023 " + c.mc2 : "") + ")");

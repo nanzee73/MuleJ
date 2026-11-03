@@ -130,6 +130,10 @@ class CharsetTest {
         assertFalse(evil.contains("\n.eval"));
         assertEquals("x__.eval_1__", CharsetImage.safeName("x\"\n.eval 1\n\""));
         assertEquals("__x", CharsetImage.safeName("../x"));
+        assertEquals("pic", CharsetImage.baseOf("pic_charset.bin"));
+        assertEquals("pic", CharsetImage.baseOf("pic_screen.bin"));
+        assertEquals("pic", CharsetImage.baseOf("pic.asm"));
+        assertEquals("my_pic", CharsetImage.baseOf("my pic.BIN"));
         byte[] prg = ViewerPrg.charset(c);
         assertEquals(0x01, prg[0]);
         assertEquals(0x08, prg[1]);
@@ -137,5 +141,20 @@ class CharsetTest {
         int off = 0x2000 - 0x0801 + 2;
         for (int i = 0; i < c.charCount() * 8; i++) assertEquals(c.charsetBytes()[i], prg[off + i]);
         assertEquals(128, c.renderCharset(P).getWidth());
+    }
+
+    @Test
+    void partsCanBeWrittenSeparately() throws Exception {
+        CharsetImage c = CharsetConverter.convert(PipelineTest.photo(320, 200), P, ColorMatcher.Space.YUV,
+                new CharsetConverter.Settings(false, 64, 2, -1, -1, -1), null);
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cs");
+        assertEquals(java.util.List.of("a_charset.bin"), c.write(dir, "a", CharsetImage.Part.CHARSET));
+        assertEquals(java.util.List.of("b_screen.bin", "b_colours.bin", "b_tiles.bin", "b_tilecolours.bin", "b_map.bin"),
+                c.write(dir, "b", CharsetImage.Part.MAP));
+        assertEquals(7, c.write(dir, "c", CharsetImage.Part.ALL).size());
+        assertArrayEquals(c.charsetBytes(), java.nio.file.Files.readAllBytes(dir.resolve("a_charset.bin")));
+        assertFalse(java.nio.file.Files.exists(dir.resolve("a_screen.bin")));
+        assertFalse(java.nio.file.Files.exists(dir.resolve("b_charset.bin")));
+        assertFalse(java.nio.file.Files.exists(dir.resolve("b.asm")));
     }
 }

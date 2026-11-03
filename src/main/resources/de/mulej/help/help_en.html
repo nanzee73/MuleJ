@@ -142,10 +142,12 @@ With more than 256 tiles the map uses two bytes per entry.</li>
 <li><b>Background</b>, <b>$D022</b>, <b>$D023</b>: automatic (best colours for the picture) or fixed.</li>
 <li><b>Dithering</b> works with the colours of each cell.</li>
 </ul>
-<p><b>Save KickAssembler (.asm + .bin)…</b> writes <i>NAME.asm</i> with constants (CHAR_COUNT, MULTICOLOR, BACKGROUND,
+<p><b>Save character set ▾</b> offers three choices. <b>Everything</b> writes <i>NAME.asm</i> with constants (CHAR_COUNT, MULTICOLOR, BACKGROUND,
 MC1, MC2, TILE_SIZE, TILE_COUNT, MAP_COLS, MAP_ROWS, MAP_16BIT) and labels with <code>.import binary</code>, plus
 <i>NAME_charset.bin</i>, <i>NAME_screen.bin</i>, <i>NAME_colours.bin</i> and, with tiles, <i>NAME_tiles.bin</i>,
 <i>NAME_tilecolours.bin</i> and <i>NAME_map.bin</i>. The character set is aligned to $800 as the VIC needs it.
+<b>Only the character set</b> writes just <i>NAME_charset.bin</i>; <b>Only the mapping</b> writes screen and colours
+(with tiles also tiles, tile colours and map) – handy when the code that uses them already exists.
 <b>Character set as PNG…</b> saves the characters as a picture (16 per row); <b>Save PRG…</b> shows the screen on the
 C64 (character set at $2000, screen at $0C00).</p>
 
@@ -165,7 +167,7 @@ each conflict cell at once. Afterwards every cell can still be changed or reset 
 
 <a name="save"></a><h2>Saving</h2>
 <ul>
-<li><b>Save Koala (.kla)… / Save Art Studio (.art)… / Save Petmate… / Save KickAssembler (.asm + .bin)…</b> – the C64
+<li><b>Save Koala (.kla)… / Save Art Studio (.art)… / Save Petmate… / Save character set ▾</b> – the C64
 file, only once the colour check has passed. It is suggested in the folder of the source picture.</li>
 <li><b>Save PRG…</b> – a runnable C64 program that shows the picture: <code>LOAD"NAME",8</code> and <code>RUN</code>;
 any key ends it.</li>
@@ -184,7 +186,8 @@ save. If a folder with that name already exists, “name (2)” is used.</p>
 <p>The File menu also has <b>New</b> (Ctrl+N), <b>Open picture</b> (Ctrl+O), <b>Open project</b> (Ctrl+Shift+O),
 <b>Open recent</b> (the last 10 projects), <b>Save as</b> (Ctrl+Shift+S), <b>Close project</b> (Ctrl+W) and <b>Open
 project folder</b>. While there are unsaved changes the title shows a “•”; before they would be lost (closing, quitting,
-opening another picture or project) the program asks whether to save.</p>
+opening another picture or project) the program asks whether to save. Opening a new picture starts with all settings at
+their defaults (only the target is kept); <i>Cancel</i> in that question keeps everything as it was.</p>
 
 <a name="preview"></a><h2>Previews, zoom and pan</h2>
 <ul>
@@ -192,6 +195,8 @@ opening another picture or project) the program asks whether to save.</p>
 (4 screen pixels per picture pixel).</li>
 <li><b>Link</b> zooms and pans both previews together, <b>Grid</b> shows pixel and 8×8 cell lines when zoomed in,
 <b>PAL</b> shows 320×200 pictures with the aspect ratio of a PAL monitor.</li>
+<li><b>Final result</b> (right preview): shows the final result instead of the output of the current step – so you see
+right away what a setting in an early step does to the end.</li>
 <li>Every group has a <b>Defaults</b> button. Sliders: arrows move by 1, the mark shows the default, double click resets.</li>
 <li>Language: menu <b>Language</b>. <i>System language</i> (the default) follows your computer – English if it is neither
 English nor German; a language chosen by hand is kept for the next start.</li>
@@ -221,7 +226,7 @@ slider or painting a stroke counts as one step. Loading a new picture starts a n
 <code>--prg FILE.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
 <code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>,
 <code>--mode mc|hires</code>, <code>--max N</code>, <code>--tiles 1|2|4</code>, <code>--mc1/--mc2 auto|0..15</code>,
-<code>--charset-png FILE.png</code>.
+<code>--charset-png FILE.png</code>, <code>--only charset|map</code>.
 <code>mulej --help</code> lists all of them. The old <code>-if FILE</code> syntax of c64palettizer, c64pixelizer and
 c64koalaverter still works.</p>
 
