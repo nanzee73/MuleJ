@@ -5,6 +5,9 @@ or a **character set** with screen and meta tiles for demo effects (KickAssemble
 **c64koalaverter** (plus c64imager), with a Swing GUI in the style of FlipperJ. The command line keeps working, and with
 the default settings it produces the same results as the old tools.
 
+**Example pictures** to try MuleJ with (five demo pictures by chocotrophy, 2400×1792 PNG, ~31 MB):
+[mulej-examples.zip](https://github.com/nanzee73/MuleJ/releases/download/v-examples/mulej-examples.zip)
+
 ## The chain
 
 Choose the **target** first, then open a picture (or drop it onto the window). Every picture runs through the same steps;

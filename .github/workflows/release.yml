@@ -17,7 +17,7 @@ name: Build & Release
 
 on:
   push:
-    tags: ['v*']                 # path filters below are not applied to tags
+    tags: ['v[0-9]*']            # version tags only (not e.g. v-examples); path filters are not applied to tags
     branches: [main]
     paths:                       # only code and build changes make a new development build
       - 'src/**'
