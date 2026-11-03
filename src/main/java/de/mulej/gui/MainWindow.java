@@ -130,12 +130,9 @@ public class MainWindow extends JFrame {
     private JPanel bitmapResult, petsciiResult;
     // colour swap (result step, every target)
     private ColourMap colourMap = ColourMap.identity();
-    private final JToggleButton[] swapFrom = new JToggleButton[16], swapTo = new JToggleButton[16];
-    private final JButton swapButton = I18n.tip(I18n.text(new JButton(), "swap.swap"), "swap.swap.tip");
-    private final JButton replaceButton = I18n.tip(I18n.text(new JButton(), "swap.replace"), "swap.replace.tip");
+    private final JButton[] swapBar = new JButton[16];
     private final JButton swapReset = I18n.tip(I18n.text(new JButton(), "swap.reset"), "swap.reset.tip");
     private final JLabel swapInfo = new JLabel(" ");
-    private final ButtonGroup swapFromGroup = new ButtonGroup(), swapToGroup = new ButtonGroup();
     private final JButton saveCharsetPngButton = I18n.tip(I18n.text(new JButton(), "save.charsetPng"), "save.charsetPng.tip");
     private final Map<Integer, int[]> cellEdits = new HashMap<>();
     private final Map<Integer, Integer> pixelEdits = new HashMap<>();
@@ -691,34 +688,29 @@ public class MainWindow extends JFrame {
         return p;
     }
 
-    /** Swap or replace colours of the finished picture (applied last, for every target). */
+    /**
+     * Swap colours of the finished picture (applied last, for every target): one bar with the 16 colours, a click
+     * opens a menu with the 15 others, choosing one swaps both.
+     */
     private JPanel buildColourSwap() {
         JPanel p = group("swap.group");
-        ButtonGroup gf = swapFromGroup, gt = swapToGroup;
-        JPanel from = new JPanel(new GridLayout(1, 16, 2, 2)), to = new JPanel(new GridLayout(1, 16, 2, 2));
+        JPanel bar = new JPanel(new GridLayout(1, 16, 2, 2));
         for (int i = 0; i < 16; i++) {
-            swapFrom[i] = swatchButton();
-            swapTo[i] = swatchButton();
-            gf.add(swapFrom[i]);
-            gt.add(swapTo[i]);
-            from.add(swapFrom[i]);
-            to.add(swapTo[i]);
-            swapFrom[i].addActionListener(e -> updateSwapButtons());
-            swapTo[i].addActionListener(e -> updateSwapButtons());
+            JButton b = new JButton();
+            b.setMargin(new Insets(1, 1, 1, 1));
+            b.setFocusable(false);
+            b.setHorizontalTextPosition(SwingConstants.CENTER);
+            b.setVerticalTextPosition(SwingConstants.BOTTOM);
+            b.setFont(b.getFont().deriveFont(9f));
+            int colour = i;
+            b.addActionListener(e -> showSwapMenu(colour));
+            swapBar[i] = b;
+            bar.add(b);
         }
-        JPanel buttons = new JPanel(new GridLayout(3, 1, 3, 3));
-        buttons.add(swapButton);
-        buttons.add(replaceButton);
-        buttons.add(swapReset);
         GridBagConstraints c = gbc();
-        c.gridy = 0; c.gridx = 0; p.add(fixedLabel("swap.from"), c);
-        c.gridx = 1; c.weightx = 1; p.add(from, c);
-        c.gridy = 1; c.gridx = 0; c.weightx = 0; p.add(fixedLabel("swap.to"), c);
-        c.gridx = 1; c.weightx = 1; p.add(to, c);
-        c.gridy = 2; c.gridx = 0; c.gridwidth = 2; p.add(swapInfo, c);
-        c.gridy = 0; c.gridx = 2; c.gridwidth = 1; c.gridheight = 3; c.weightx = 0; p.add(buttons, c);
-        swapButton.addActionListener(e -> changeColours(true));
-        replaceButton.addActionListener(e -> changeColours(false));
+        c.gridy = 0; c.gridx = 0; c.weightx = 1; p.add(bar, c);
+        c.gridx = 1; c.weightx = 0; c.fill = GridBagConstraints.NONE; p.add(swapReset, c);
+        c.gridy = 1; c.gridx = 0; c.gridwidth = 2; c.fill = GridBagConstraints.HORIZONTAL; p.add(swapInfo, c);
         swapReset.addActionListener(e -> {
             colourMap = ColourMap.identity();
             changed(Step.COLOURS);
@@ -726,28 +718,22 @@ public class MainWindow extends JFrame {
         return p;
     }
 
-    private static JToggleButton swatchButton() {
-        JToggleButton b = new JToggleButton();
-        b.setMargin(new Insets(1, 1, 1, 1));
-        b.setFocusable(false);
-        b.setHorizontalTextPosition(SwingConstants.CENTER);
-        b.setVerticalTextPosition(SwingConstants.BOTTOM);
-        b.setFont(b.getFont().deriveFont(9f));
-        return b;
-    }
-
-    private static int selectedIndex(JToggleButton[] bs) {
-        for (int i = 0; i < bs.length; i++) if (bs[i].isSelected()) return i;
-        return -1;
-    }
-
-    private void changeColours(boolean swap) {
-        int a = selectedIndex(swapFrom), b = selectedIndex(swapTo);
-        if (a < 0 || b < 0 || a == b) return;
-        colourMap = swap ? colourMap.swap(a, b) : colourMap.replace(a, b);
-        swapFromGroup.clearSelection();                     // done: choose the next pair from scratch
-        swapToGroup.clearSelection();
-        changed(Step.COLOURS);
+    /** Menu below a colour of the bar with the 15 other colours; choosing one swaps the two. */
+    private void showSwapMenu(int colour) {
+        JPopupMenu m = new JPopupMenu();
+        Palette pal = palette();
+        for (int i = 0; i < 16; i++) {
+            if (i == colour) continue;
+            int other = i;
+            JMenuItem item = new JMenuItem(i + " " + tr("color." + i), new ColourIcon(pal.rgb(i), 14));
+            item.addActionListener(e -> {
+                colourMap = colourMap.swap(colour, other);
+                changed(Step.COLOURS);
+            });
+            m.add(item);
+        }
+        JButton b = swapBar[colour];
+        m.show(b, 0, b.getHeight());
     }
 
     /** The colour that has to be used before the swap so that colour c is shown (c itself if none). */
@@ -775,19 +761,15 @@ public class MainWindow extends JFrame {
         return n;
     }
 
-    /** Swatches with the colours in use, the active changes and hints. */
+    /** The colour bar with the pixel counts of the result, the active swaps and hints. */
     private void updateColourSwap() {
         int[] n = resultColourCounts();
         Palette pal = palette();
         for (int i = 0; i < 16; i++) {
-            swapFrom[i].setIcon(new ColourIcon(pal.rgb(i), 14));
-            swapFrom[i].setText(n[i] > 0 ? String.valueOf(n[i]) : " ");
-            swapFrom[i].setToolTipText(tr("swap.from.tip", i, tr("color." + i), n[i]));
-            swapFrom[i].setEnabled(source != null && n[i] > 0);
-            swapTo[i].setIcon(new ColourIcon(pal.rgb(i), 14));
-            swapTo[i].setText(String.valueOf(i));
-            swapTo[i].setToolTipText(tr("swap.to.tip", i, tr("color." + i)));
-            swapTo[i].setEnabled(source != null);
+            swapBar[i].setIcon(new ColourIcon(pal.rgb(i), 14));
+            swapBar[i].setText(n[i] > 0 ? String.valueOf(n[i]) : " ");
+            swapBar[i].setToolTipText(tr("swap.bar.tip", i, tr("color." + i), n[i]));
+            swapBar[i].setEnabled(source != null);
         }
         Pipeline.Outputs o = outputs;
         String text;
@@ -796,15 +778,7 @@ public class MainWindow extends JFrame {
         else text = tr("swap.active", colourMap.describe());
         if (o != null && o.charset() != null && o.charset().keptCells > 0)
             text += " " + tr("swap.kept", o.charset().keptCells);
-        swapInfo.setText(wrapped("<small>" + text + "</small>"));
-        updateSwapButtons();
-    }
-
-    private void updateSwapButtons() {
-        int a = selectedIndex(swapFrom), b = selectedIndex(swapTo);
-        boolean ok = source != null && a >= 0 && b >= 0 && a != b && swapFrom[a].isEnabled();
-        swapButton.setEnabled(ok);
-        replaceButton.setEnabled(ok);
+        swapInfo.setText("<html><small>" + text + "</small></html>");   // full width below the bar
         swapReset.setEnabled(source != null && !colourMap.isIdentity());
     }
 
