@@ -1,0 +1,252 @@
+<html><body>
+<h1>MuleJ – Handleiding</h1>
+<p>MuleJ zet elke afbeelding om naar C64-graphics: een <b>multicolor</b>-afbeelding (Koala Painter), een <b>hires</b>-afbeelding
+(Art Studio), een <b>PETSCII</b>-tekstscherm (Petmate) of een <b>tekenset</b> met scherm en metategels voor demo-effecten
+(KickAssembler) – telkens ook als startbaar C64-programma. Het controleert of elke cel zich aan de C64-kleurregels houdt
+en kan de cellen corrigeren die dat niet doen. Alles werkt ook op de opdrachtregel.</p>
+
+<p><b>Inhoud</b></p>
+<ul>
+<li><a href="#quick">Snelstart</a></li>
+<li><a href="#targets">Doelen: multicolor, hires, PETSCII, tekenset</a></li>
+<li><a href="#chain">De keten van stappen</a></li>
+<li><a href="#input">Afbeeldingen openen en "Beginnen bij"</a></li>
+<li><a href="#frame">Stap 2: Uitsnede</a></li>
+<li><a href="#prepare">Stap 3: Voorbereiden</a></li>
+<li><a href="#pixel">Stap 4: Pixelizer</a></li>
+<li><a href="#colours">Stap 5: Kleuren</a></li>
+<li><a href="#petscii">PETSCII-instellingen</a></li>
+<li><a href="#charset">Tekenset en tegels</a></li>
+<li><a href="#result">Stap 6: Resultaat – kleurcontrole, correctie, bewerken</a></li>
+<li><a href="#save">Opslaan</a></li>
+<li><a href="#projects">Projecten</a></li>
+<li><a href="#preview">Voorbeelden, zoomen en verschuiven</a></li>
+<li><a href="#cli">Opdrachtregel</a></li>
+<li><a href="#tips">Tips</a></li>
+</ul>
+
+<a name="quick"></a><h2>Snelstart</h2>
+<ol>
+<li>Kies bovenaan het <b>Doel</b>: Multicolor, Hires, PETSCII of Tekenset.</li>
+<li><b>Afbeelding openen…</b> of sleep een bestand naar het venster. MuleJ bekijkt de afbeelding en beslist waar het begint
+(zie <a href="#input">Beginnen bij</a>).</li>
+<li>Loop de stappen door met <b>Verder ▶</b> en <b>◀ Terug</b>, of klik op een stap in de balk bovenaan.
+Elke stap toont links zijn invoer en rechts zijn uitvoer.</li>
+<li>In de laatste stap, <b>Resultaat</b>, moet de kleurcontrole slagen. Sla dan het C64-bestand op (.kla, .art, Petmate of
+tekenset) en/of een startbaar <b>PRG</b>.</li>
+</ol>
+
+<a name="targets"></a><h2>Doelen</h2>
+<table border="1" cellspacing="0">
+<tr><th>Doel</th><th>Afbeelding</th><th>Regels</th><th>Bestand</th></tr>
+<tr><td>Multicolor</td><td>160×200, dubbelbrede pixels</td><td>per 4×8-cel 3 kleuren plus één achtergrondkleur voor de hele afbeelding</td><td>Koala Painter (.kla)</td></tr>
+<tr><td>Hires</td><td>320×200</td><td>per 8×8-cel 2 kleuren</td><td>Art Studio (.art)</td></tr>
+<tr><td>PETSCII</td><td>40×25 tekens</td><td>per 8×8-cel één teken in één kleur plus één gedeelde achtergrondkleur</td><td>Petmate-werkbestand (.petmate)</td></tr>
+<tr><td>Tekenset</td><td>40×25 tekens, eigen tekenset</td><td>hires-tekens: achtergrond plus één kleur per cel; multicolor-tekens: achtergrond, $D022, $D023 plus één kleur 0–7 per cel; hoogstens 256 (of minder) tekens</td><td>KickAssembler-broncode + .bin-bestanden</td></tr>
+</table>
+
+<a name="chain"></a><h2>De keten van stappen</h2>
+<p>De twee voorbeelden tonen de invoer en de uitvoer van de huidige stap; de instellingen van de stap staan eronder.
+Sleep de scheidingslijn tussen voorbeelden en instellingen om de grootte te veranderen – bij elke stapwissel wordt hij
+passend gezet.</p>
+<p><b>1 Origineel</b> → <b>2 Uitsnede</b> → <b>3 Voorbereiden</b> → <b>4 Pixelizer</b> (alleen multicolor-bitmap of
+multicolor-tekens) → <b>5 Kleuren</b> → <b>6 Resultaat</b>. Elke stap werkt met de uitvoer van de vorige. Verander je iets
+in een vroege stap, dan worden alle latere stappen automatisch bijgewerkt. Een "overgeslagen" stap geeft de afbeelding
+ongewijzigd door; <b>Deze stap gebruiken</b> schakelt hem weer in.</p>
+
+<a name="input"></a><h2>Afbeeldingen openen en "Beginnen bij"</h2>
+<p>MuleJ leest alle gangbare pc-formaten (PNG, JPEG, GIF, BMP, WebP, TIFF, …) en C64-afbeeldingen: Koala, Art Studio,
+Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph, AFLI, Gunpaint, Funpaint, NUFLI, MUFLI, MUIFLI en de ruwe
+bestanden van FlipperJ. C64-afbeeldingen worden met het gekozen palet getekend; Art Studio, AFLI, NUFLI, MUFLI en MUIFLI
+zetten het doel op Hires, de andere op Multicolor.</p>
+<p><b>Beginnen bij</b> bepaalt welke stappen de afbeelding nog nodig heeft. <i>Automatisch</i> bekijkt de afbeelding:</p>
+<ul>
+<li>niet 320×200 → beginnen bij <i>Uitsnede</i>;</li>
+<li>320×200 met vrije kleuren → beginnen bij <i>Voorbereiden</i>;</li>
+<li>C64-kleuren, maar pixelparen verschillen (multicolor) → beginnen bij <i>Pixelizer</i>;</li>
+<li>C64-formaat en C64-kleuren → beginnen bij de kleurcontrole (<i>Resultaat</i>), er wordt niets veranderd.</li>
+</ul>
+<p>Kies zelf een stap als je afbeelding al elders is voorbereid of bewerkt. Alle stappen ervoor worden ongewijzigd
+doorgegeven.</p>
+
+<a name="frame"></a><h2>Stap 2: Uitsnede</h2>
+<p>Kies het 320×200-deel van de afbeelding: sleep binnen het kader om het te verplaatsen, sleep de hoek om de grootte te
+wijzigen, sleep erbuiten voor een nieuw kader; muiswiel = zoomen, rechts of midden slepen = verschuiven, dubbelklik = hele
+afbeelding.</p>
+<ul>
+<li><b>Beeldverhouding</b> van het resultaat (C64 PAL, vierkante pixels, NTSC of vrij) en <b>Uitsnede vastzetten op
+doelverhouding</b>.</li>
+<li><b>Schalen:</b> Uitrekken, Passend (met randen, zie <b>Randkleur…</b>), Vullen (bijsnijden) of 1:1.
+<b>320×200-uitsnede (1:1)</b> neemt precies 320×200 pixels zonder schaling – een klik verplaatst het kader daarheen.</li>
+<li><b>Filter:</b> vlakgemiddelde (zacht) voor foto's, dichtstbijzijnde buur voor pixelart.</li>
+<li><b>Hele afbeelding</b> en <b>Grootste gecentreerde uitsnede</b> zijn snelkoppelingen; X, Y, Breedte en Hoogte zetten
+het kader exact.</li>
+</ul>
+
+<a name="prepare"></a><h2>Stap 3: Voorbereiden</h2>
+<p><b>Contrast</b> en <b>Helderheid</b> (-100 tot 100), <b>Gamma %</b> (onder 100 = lichtere middentonen) en
+<b>Verzadiging %</b> (0 = grijs). De C64 heeft weinig donkere en weinig verzadigde kleuren, daarom helpt wat meer contrast
+en verzadiging vaak.</p>
+
+<a name="pixel"></a><h2>Stap 4: Pixelizer (alleen multicolor)</h2>
+<p>De stap verschijnt bij multicolor-afbeeldingen en bij tekensets met multicolor-tekens.</p>
+<p>Multicolorpixels zijn twee keer zo breed, dus elk pixelpaar wordt één pixel. Welke pixel blijft, bepaalt hoe dunne
+lijnen eruitzien:</p>
+<ul>
+<li><b>Links → rechts:</b> de linker pixel van elk paar blijft.</li>
+<li><b>Rechts → links:</b> de rechter pixel blijft.</li>
+</ul>
+
+<a name="colours"></a><h2>Stap 5: Kleuren</h2>
+<ul>
+<li><b>Palet:</b> welke RGB-kleuren de 16 C64-kleuren hebben (Colodore, Pepto, DeeKay, …). <b>Eigen…</b> opent de
+paleteditor: kleuren wijzigen, .vpl-/.gpl-/hex-bestanden laden, opslaan als .vpl.</li>
+<li><b>Afstemming:</b> hoe "gelijkend" wordt gemeten – <i>RGB euclidisch</i> (zoals de oude c64palettizer),
+<i>RGB gewogen</i>, <i>YUV</i> of <i>HSL</i>.</li>
+<li><b>Dithering</b> (Floyd-Steinberg, Atkinson, Jarvis, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8) mengt kleuren in fijne
+patronen. <b>Sterkte</b> bepaalt hoeveel; <b>Slangvormig (serpentine)</b> voorkomt diagonale patronen. Dithering werkt
+voor elk doel: bij PETSCII en tekensets gebruikt het de kleuren die voor elke cel gekozen zijn.</li>
+<li><b>Doorlopen (over celgrenzen):</b> de ditherfout mag doorlopen in naburige cellen – zachter, maar de celranden worden
+minder strak.</li>
+<li><b>Achtergrond:</b> automatisch (beste kleur) of vast (multicolor en PETSCII).</li>
+<li><b>Automatisch corrigeren:</b> cellen met te veel kleuren krijgen de kleuren die ze het best weergeven. Met dithering
+houdt het resultaat zich altijd aan de regels.</li>
+</ul>
+
+<a name="petscii"></a><h2>PETSCII-instellingen</h2>
+<p>Elke cel krijgt het teken en de kleur die het meest op het origineel lijken – pixel voor pixel en vervaagd beoordeeld,
+zoals het oog het ziet.</p>
+<ul>
+<li><b>Tekens:</b> <i>Hoofdletters + grafisch</i> of <i>Kleine + hoofdletters</i> (de twee C64-tekensets).</li>
+<li><b>Letters en cijfers gebruiken:</b> uit = alleen grafische tekens, spatie en omgekeerde spatie – meestal rustiger.</li>
+<li><b>Detail:</b> hoog = tekens volgen randen pixel voor pixel; laag = alleen helderheid en kleur van de cellen (zacht).</li>
+<li><b>Diffusie:</b> hoeveel van de resterende fout van een cel naar de buren gaat (goed voor verlopen en vlakken).</li>
+<li><b>Rust:</b> drukke tekens verschijnen alleen waar ze duidelijk helpen.</li>
+</ul>
+<p><b>Dithering</b> (in de groep links) kan ook bij PETSCII: een eerste doorgang kiest de achtergrond en voor elke cel de
+kleur die er het best mee mengt. Daarna wordt de afbeelding alleen met die twee kleuren per cel gedithered, en een
+tweede, pixelnauwkeurige doorgang zoekt de tekens die het ditherpatroon volgen – schaakbord- en stippeltekens geven de
+tussentinten weer. Geordende dithering (Bayer) geeft rustige, regelmatige patronen; Floyd-Steinberg en Atkinson meer
+detail.</p>
+<p>Om een PETSCII-afbeelding verder te bewerken: opslaan als Petmate-bestand en openen in Petmate.</p>
+
+<a name="charset"></a><h2>Tekenset en tegels</h2>
+<p>Het doel <b>Tekenset</b> maakt van de afbeelding een eigen tekenset plus een scherm met tekencodes en kleuren – het
+ruwe materiaal voor demo-effecten (scrollers, tegel-engines, tekenanimaties).</p>
+<ul>
+<li><b>Hires-tekens</b> (8×8 pixels): een gedeelde achtergrond plus één kleur (0–15) per cel.
+<b>Multicolor-tekens</b> (4×8 dubbelbrede pixels, de pixelizer-stap verschijnt): achtergrond, $D022 en $D023 voor het
+hele scherm plus één kleur 0–7 per cel (in het kleuren-RAM met bit 3 gezet).</li>
+<li><b>Max. tekens</b> (2–256): elke cel krijgt eerst haar eigen exacte teken. Zijn het er meer, dan worden de meest
+gelijkende tekens samengevoegd (k-means op de kleurfout) en neemt elke cel de kleur die het best bij het samengevoegde
+teken past. Minder tekens = meer geheugen voor code, maar een grovere afbeelding.</li>
+<li><b>Metategels</b> 1×1, 2×2 of 4×4: het scherm wordt ook beschreven als kaart van tegels van n×n tekens; identieke
+tegels worden één keer opgeslagen. De kaart heeft ⌈40/n⌉×⌈25/n⌉ posities; plekken buiten het scherm krijgen het lege
+teken (code 0). Bij meer dan 256 tegels gebruikt de kaart twee bytes per positie.</li>
+<li><b>Achtergrond</b>, <b>$D022</b>, <b>$D023</b>: automatisch (beste kleuren voor de afbeelding) of vast.</li>
+<li><b>Dithering</b> werkt met de kleuren van elke cel.</li>
+</ul>
+<p><b>Tekenset opslaan ▾</b> biedt drie keuzes. <b>Alles</b> schrijft <i>NAME.asm</i> met constanten (CHAR_COUNT,
+MULTICOLOR, BACKGROUND, MC1, MC2, TILE_SIZE, TILE_COUNT, MAP_COLS, MAP_ROWS, MAP_16BIT) en labels met
+<code>.import binary</code>, plus <i>NAME_charset.bin</i>, <i>NAME_screen.bin</i>, <i>NAME_colours.bin</i> en, met tegels,
+<i>NAME_tiles.bin</i>, <i>NAME_tilecolours.bin</i> en <i>NAME_map.bin</i>. De tekenset wordt uitgelijnd op $800, zoals de
+VIC dat nodig heeft. <b>Alleen de tekenset</b> schrijft alleen <i>NAME_charset.bin</i>; <b>Alleen de mapping</b> schrijft
+scherm en kleuren (met tegels ook tegels, tegelkleuren en kaart) – handig als de code die ze gebruikt al bestaat.
+<b>Tekenset als PNG…</b> slaat de tekens op als afbeelding (16 per rij); <b>PRG opslaan…</b> toont het scherm op de C64
+(tekenset op $2000, scherm op $0C00).</p>
+
+<a name="result"></a><h2>Stap 6: Resultaat – kleurcontrole, correctie, bewerken</h2>
+<p>MuleJ controleert alle 1000 cellen. "✔" betekent dat elke cel zich aan de regels houdt; "✘" toont hoeveel cellen te veel
+kleuren hebben.</p>
+<ul>
+<li><b>◀ ▶</b> springen naar de vorige / volgende cel met te veel kleuren. <b>Markeren</b> toont ze in het voorbeeld:
+rood = overtreedt de regels, geel = gecorrigeerd, cyaan = geselecteerde cel (alleen in het voorbeeld, nooit in bestanden).</li>
+<li><b>Klik in het resultaat:</b> <i>Cel kiezen</i> – een linkerklik kiest een cel en toont haar kleuren met het aantal
+pixels; <i>Tekenen</i> – een linkerklik of slepen zet pixels op de gekozen kleur.</li>
+<li>Voor een gekozen cel: druk tot het toegestane aantal kleuren in (AG = achtergrond, bij multicolor altijd toegestaan) en
+<b>Kleuren toepassen</b> – elke pixel krijgt de dichtstbijzijnde. <b>Automatisch</b> kiest de beste kleuren voor deze cel,
+<b>Cel terugzetten</b> verwerpt je kleuren en getekende pixels, <b>Alles verwerpen</b> doet dat voor elke cel (na een
+vraag).</li>
+<li><b>Alles corrigeren</b> geeft elke cel met te veel kleuren de kleuren die haar het best weergeven – zoals
+<i>Automatisch</i>, maar voor alle conflictcellen tegelijk. Daarna kan elke cel nog met de hand worden aangepast of
+teruggezet.</li>
+</ul>
+
+<a name="save"></a><h2>Opslaan</h2>
+<ul>
+<li><b>Koala opslaan (.kla)… / Art Studio opslaan (.art)… / Petmate opslaan… / Tekenset opslaan ▾</b> – het C64-bestand,
+pas als de kleurcontrole geslaagd is. Voorgesteld wordt de map van de bronafbeelding.</li>
+<li><b>PRG opslaan…</b> – een startbaar C64-programma dat de afbeelding toont: <code>LOAD"NAME",8</code> en
+<code>RUN</code>; een willekeurige toets stopt het.</li>
+<li><b>Deze stap als PNG…</b> – de uitvoer van de getoonde stap zonder markeringen, bijv. om hem op pc of telefoon te
+bewerken en later weer te laden (kies die stap bij "Beginnen bij"). De vergrotingsfactor ernaast maakt bewerken
+makkelijker; MuleJ verkleint de afbeelding bij het laden weer exact.</li>
+<li>MuleJ vraagt het voordat een bestand wordt overschreven, en waarschuwt vooral voordat de geopende afbeelding wordt
+overschreven.</li>
+</ul>
+
+<a name="projects"></a><h2>Projecten</h2>
+<p>Een <b>project</b> houdt een afbeelding samen met alle instellingen en bewerkingen, zodat je later verder kunt.
+<b>Bestand ▸ Project opslaan</b> (Ctrl+S, op macOS ⌘S) maakt in <i>Projecten</i> een map met de naam van de afbeelding –
+naast het programma als daar geschreven mag worden, anders in <i>Documenten/MuleJ</i>. Daarin staan het projectbestand
+(<i>naam.mulej</i>), <i>import/</i> met een kopie van de afbeelding en <i>export/</i> met alle resultaten, die bij elke
+keer opslaan opnieuw worden geschreven. Bestaat er al een map met die naam, dan wordt “naam (2)” gebruikt.</p>
+<p>Het menu Bestand heeft verder <b>Nieuw</b> (Ctrl+N), <b>Afbeelding openen</b> (Ctrl+O), <b>Project openen</b>
+(Ctrl+Shift+O), <b>Recent geopend</b> (de laatste 10 projecten), <b>Project opslaan als</b> (Ctrl+Shift+S),
+<b>Project sluiten</b> (Ctrl+W) en <b>Projectmap openen</b>. Zolang er niet-opgeslagen wijzigingen zijn, toont de titel
+een “•”; voordat ze verloren zouden gaan (sluiten, afsluiten, een andere afbeelding of ander project openen) vraagt het
+programma of er moet worden opgeslagen. Een nieuw geopende afbeelding begint met alle instellingen op standaard (alleen
+het doel blijft); <i>Annuleren</i> in die vraag laat alles zoals het was.</p>
+
+<a name="preview"></a><h2>Voorbeelden, zoomen en verschuiven</h2>
+<ul>
+<li>Muiswiel = zoomen, rechts slepen = verschuiven, dubbelklik = passend. Knoppen: −, +, <b>Passend</b> en <b>4×</b>
+(4 schermpixels per beeldpixel).</li>
+<li><b>Koppelen</b> zoomt en verschuift beide voorbeelden samen, <b>Raster</b> toont bij inzoomen pixel- en
+8×8-cellijnen, <b>PAL</b> toont 320×200-afbeeldingen in de beeldverhouding van een PAL-monitor.</li>
+<li><b>Eindresultaat</b> (rechter voorbeeld): toont het eindresultaat in plaats van de uitvoer van de huidige stap – zo zie
+je meteen wat een instelling in een vroege stap aan het eind doet.</li>
+<li>Elke groep heeft een knop <b>Standaard</b>. Schuifregelaars: pijlen verschuiven met 1, de markering toont de
+standaardwaarde, dubbelklik zet terug.</li>
+<li>Taal: menu <b>Taal</b> – Engels, Duits, Nederlands, Zweeds of Pools. <i>Systeemtaal</i> (standaard) volgt je
+computer – Engels als het geen van deze is; een met de hand gekozen taal blijft bij de volgende start behouden.</li>
+</ul>
+
+<p><b>Ongedaan maken:</b> <b>Bewerken ▸ Ongedaan maken</b> (Ctrl+Z, op macOS ⌘Z) draait de laatste wijziging terug – een
+instelling, de uitsnede, de beginstap, het doel of een bewerking in de kleurcontrole (celkleuren, tekenen, Alles
+corrigeren, Alles verwerpen); <b>Bewerken ▸ Opnieuw</b> (Ctrl+Y, op macOS ⇧⌘Z) voert die weer uit – tot 100 stappen. Het
+menu noemt wat er verandert. Een schuifregelaar slepen of een penseelstreek telt als één stap. Een nieuw geopende
+afbeelding begint een nieuwe geschiedenis.</p>
+
+<a name="cli"></a><h2>Opdrachtregel</h2>
+<pre>mulej &lt;opdracht&gt; [opties] &lt;invoer&gt; [uitvoer]</pre>
+<table border="1" cellspacing="0">
+<tr><th>Opdracht</th><th>Doet</th></tr>
+<tr><td><code>palettize</code></td><td>zet alle kleuren om naar de dichtstbijzijnde paletkleur → NAME_palettized.png</td></tr>
+<tr><td><code>pixelize</code></td><td>maakt 2×1-multicolorpixels → NAME_pixelized_l2r.png / _r2l.png</td></tr>
+<tr><td><code>koala</code></td><td>multicolor-bitmap → NAME.kla</td></tr>
+<tr><td><code>hires</code></td><td>hires-bitmap → NAME.art</td></tr>
+<tr><td><code>petscii</code></td><td>tekstscherm → NAME.petmate</td></tr>
+<tr><td><code>chars</code></td><td>tekenset + scherm (+ tegels) → NAME.asm + NAME_*.bin</td></tr>
+<tr><td><code>check</code></td><td>somt de cellen op die de regels van <code>--mode mc|hires</code> overtreden</td></tr>
+<tr><td><code>topng</code></td><td>C64-afbeelding of Petmate-bestand → NAME.png</td></tr>
+</table>
+<p>Belangrijke opties: <code>--palette NAAM|BESTAND</code>, <code>--space euclid|rgb|yuv|hsl</code>,
+<code>--fit stretch|fit|fill|none</code>, <code>--dither NAAM</code>, <code>--strength N</code>, <code>--serpentine</code>,
+<code>--no-bleeding</code>, <code>--bg auto|0..15</code>, <code>--fix-clashes</code>, <code>--preview BESTAND.png</code>,
+<code>--prg BESTAND.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
+<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>,
+<code>--mode mc|hires</code>, <code>--max N</code>, <code>--tiles 1|2|4</code>, <code>--mc1/--mc2 auto|0..15</code>,
+<code>--charset-png BESTAND.png</code>, <code>--only charset|map</code>.
+<code>mulej --help</code> somt ze allemaal op. De oude <code>-if BESTAND</code>-schrijfwijze van c64palettizer,
+c64pixelizer en c64koalaverter werkt nog steeds.</p>
+
+<a name="tips"></a><h2>Tips</h2>
+<ul>
+<li>Pixelart die voor de C64 getekend is: begin bij de kleurcontrole, gebruik geen dithering en corrigeer losse cellen met
+de hand.</li>
+<li>Foto's: wat meer contrast en verzadiging, Floyd-Steinberg- of Atkinson-dithering.</li>
+<li>Te veel conflicten: zet <i>Automatisch corrigeren</i> aan of probeer een vaste achtergrondkleur.</li>
+</ul>
+<p>Feedback en foutmeldingen zijn welkom op GitHub: <a href="https://github.com/nanzee73/MuleJ">github.com/nanzee73/MuleJ</a></p>
+</body></html>

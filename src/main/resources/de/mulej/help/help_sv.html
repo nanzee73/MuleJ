@@ -1,0 +1,242 @@
+<html><body>
+<h1>MuleJ – Handbok</h1>
+<p>MuleJ gör om vilken bild som helst till C64-grafik: en <b>multicolor</b>-bild (Koala Painter), en <b>hires</b>-bild
+(Art Studio), en <b>PETSCII</b>-textskärm (Petmate) eller en <b>teckenuppsättning</b> med skärm och metabrickor för
+demoeffekter (KickAssembler) – alltid även som körbart C64-program. Programmet kontrollerar att varje cell följer
+C64:ans färgregler och kan korrigera de celler som inte gör det. Allt fungerar även på kommandoraden.</p>
+
+<p><b>Innehåll</b></p>
+<ul>
+<li><a href="#quick">Snabbstart</a></li>
+<li><a href="#targets">Mål: multicolor, hires, PETSCII, teckenuppsättning</a></li>
+<li><a href="#chain">Kedjan av steg</a></li>
+<li><a href="#input">Öppna bilder och "Börja vid"</a></li>
+<li><a href="#frame">Steg 2: Utsnitt</a></li>
+<li><a href="#prepare">Steg 3: Förbered</a></li>
+<li><a href="#pixel">Steg 4: Pixelizer</a></li>
+<li><a href="#colours">Steg 5: Färger</a></li>
+<li><a href="#petscii">PETSCII-inställningar</a></li>
+<li><a href="#charset">Teckenuppsättning och brickor</a></li>
+<li><a href="#result">Steg 6: Resultat – färgkontroll, korrigering, redigering</a></li>
+<li><a href="#save">Spara</a></li>
+<li><a href="#projects">Projekt</a></li>
+<li><a href="#preview">Förhandsvisningar, zoom och panorering</a></li>
+<li><a href="#cli">Kommandorad</a></li>
+<li><a href="#tips">Tips</a></li>
+</ul>
+
+<a name="quick"></a><h2>Snabbstart</h2>
+<ol>
+<li>Välj <b>Mål</b> högst upp: Multicolor, Hires, PETSCII eller Teckenuppsättning.</li>
+<li><b>Öppna bild…</b> eller släpp en fil i fönstret. MuleJ tittar på bilden och bestämmer var den börjar
+(se <a href="#input">Börja vid</a>).</li>
+<li>Gå igenom stegen med <b>Nästa ▶</b> och <b>◀ Tillbaka</b>, eller klicka på ett steg i raden högst upp.
+Varje steg visar sina indata till vänster och sina utdata till höger.</li>
+<li>I sista steget, <b>Resultat</b>, måste färgkontrollen godkännas. Spara sedan C64-filen (.kla, .art, Petmate eller
+teckenuppsättning) och/eller ett körbart <b>PRG</b>.</li>
+</ol>
+
+<a name="targets"></a><h2>Mål</h2>
+<table border="1" cellspacing="0">
+<tr><th>Mål</th><th>Bild</th><th>Regler</th><th>Fil</th></tr>
+<tr><td>Multicolor</td><td>160×200, dubbelt så breda pixlar</td><td>per 4×8-cell 3 färger plus en bakgrundsfärg för hela bilden</td><td>Koala Painter (.kla)</td></tr>
+<tr><td>Hires</td><td>320×200</td><td>per 8×8-cell 2 färger</td><td>Art Studio (.art)</td></tr>
+<tr><td>PETSCII</td><td>40×25 tecken</td><td>per 8×8-cell ett tecken i en färg plus en gemensam bakgrundsfärg</td><td>Petmate-arbetsfil (.petmate)</td></tr>
+<tr><td>Teckenuppsättning</td><td>40×25 tecken, egen teckenuppsättning</td><td>hires-tecken: bakgrund plus en färg per cell; multicolor-tecken: bakgrund, $D022, $D023 plus en färg 0–7 per cell; högst 256 (eller färre) tecken</td><td>KickAssembler-källkod + .bin-filer</td></tr>
+</table>
+
+<a name="chain"></a><h2>Kedjan av steg</h2>
+<p>De två förhandsvisningarna visar indata och utdata för det aktuella steget; stegets inställningar finns under dem.
+Dra i avdelaren mellan förhandsvisningar och inställningar för att ändra storlekarna – den anpassas varje gång du byter
+steg.</p>
+<p><b>1 Original</b> → <b>2 Utsnitt</b> → <b>3 Förbered</b> → <b>4 Pixelizer</b> (endast multicolor-bitmapp eller
+multicolor-tecken) → <b>5 Färger</b> → <b>6 Resultat</b>. Varje steg arbetar med utdata från steget före. Ändrar du något
+i ett tidigt steg uppdateras alla senare steg automatiskt. Ett steg som "hoppas över" skickar bilden vidare oförändrad;
+<b>Använd detta steg</b> slår på det igen.</p>
+
+<a name="input"></a><h2>Öppna bilder och "Börja vid"</h2>
+<p>MuleJ läser alla vanliga datorformat (PNG, JPEG, GIF, BMP, WebP, TIFF, …) och C64-bilder: Koala, Art Studio,
+Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph, AFLI, Gunpaint, Funpaint, NUFLI, MUFLI, MUIFLI och FlipperJ:s
+råfiler. C64-bilder ritas med den valda paletten; Art Studio, AFLI, NUFLI, MUFLI och MUIFLI sätter målet till Hires,
+de övriga till Multicolor.</p>
+<p><b>Börja vid</b> avgör vilka steg bilden fortfarande behöver. <i>Automatiskt</i> tittar på bilden:</p>
+<ul>
+<li>inte 320×200 → börja vid <i>Utsnitt</i>;</li>
+<li>320×200 med fria färger → börja vid <i>Förbered</i>;</li>
+<li>C64-färger men pixelparen skiljer sig (multicolor) → börja vid <i>Pixelizer</i>;</li>
+<li>C64-storlek och C64-färger → börja vid färgkontrollen (<i>Resultat</i>), inget ändras.</li>
+</ul>
+<p>Välj ett steg för hand om bilden redan förberetts eller redigerats någon annanstans. Alla steg före det skickas vidare
+oförändrade.</p>
+
+<a name="frame"></a><h2>Steg 2: Utsnitt</h2>
+<p>Välj bildens 320×200-del: dra inuti ramen för att flytta den, dra i hörnet för att ändra storlek, dra utanför för att
+rita en ny; mushjul = zoom, dra med höger eller mitten = panorera, dubbelklick = hela bilden.</p>
+<ul>
+<li>Resultatets <b>bildförhållande</b> (C64 PAL, kvadratiska pixlar, NTSC eller fritt) och <b>Lås utsnittet till
+målformatet</b>.</li>
+<li><b>Skalning:</b> Sträck, Anpassa (med kanter, se <b>Kantfärg…</b>), Fyll (beskär) eller 1:1.
+<b>320×200-utsnitt (1:1)</b> tar exakt 320×200 pixlar utan skalning – ett klick flyttar ramen dit.</li>
+<li><b>Filter:</b> ytmedelvärde (mjukt) för foton, närmaste granne för pixelgrafik.</li>
+<li><b>Hela bilden</b> och <b>Största centrerade utsnitt</b> är genvägar; X, Y, Bredd och Höjd sätter ramen exakt.</li>
+</ul>
+
+<a name="prepare"></a><h2>Steg 3: Förbered</h2>
+<p><b>Kontrast</b> och <b>Ljusstyrka</b> (-100 till 100), <b>Gamma %</b> (under 100 = ljusare mellantoner) och
+<b>Mättnad %</b> (0 = grått). C64:an har få mörka och få mättade färger, så lite mer kontrast och mättnad hjälper ofta.</p>
+
+<a name="pixel"></a><h2>Steg 4: Pixelizer (endast multicolor)</h2>
+<p>Steget visas för multicolor-bilder och för teckenuppsättningar med multicolor-tecken.</p>
+<p>Multicolorpixlar är dubbelt så breda, så varje pixelpar blir en pixel. Vilken pixel som blir kvar avgör hur tunna linjer
+ser ut:</p>
+<ul>
+<li><b>Vänster → höger:</b> den vänstra pixeln i varje par blir kvar.</li>
+<li><b>Höger → vänster:</b> den högra pixeln blir kvar.</li>
+</ul>
+
+<a name="colours"></a><h2>Steg 5: Färger</h2>
+<ul>
+<li><b>Palett:</b> vilka RGB-färger de 16 C64-färgerna har (Colodore, Pepto, DeeKay, …). <b>Egen…</b> öppnar
+paletteditorn: ändra färger, läs in .vpl-/.gpl-/hex-filer, spara som .vpl.</li>
+<li><b>Matchning:</b> hur "likhet" mäts – <i>RGB euklidiskt</i> (som den gamla c64palettizer), <i>RGB viktat</i>,
+<i>YUV</i> eller <i>HSL</i>.</li>
+<li><b>Dithering</b> (Floyd-Steinberg, Atkinson, Jarvis, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8) blandar färger i fina
+mönster. <b>Styrka</b> anger hur mycket; <b>Serpentin</b> undviker diagonala mönster. Dithering fungerar för alla mål:
+för PETSCII och teckenuppsättningar används de färger som valts för varje cell.</li>
+<li><b>Utflytning (över cellgränser):</b> ditherfelet får fortsätta in i närliggande celler – mjukare, men cellkanterna blir
+mindre rena.</li>
+<li><b>Bakgrund:</b> automatisk (bästa färgen) eller fast (multicolor och PETSCII).</li>
+<li><b>Korrigera automatiskt:</b> celler med för många färger får de färger som återger dem bäst. Med dithering följer
+resultatet alltid reglerna.</li>
+</ul>
+
+<a name="petscii"></a><h2>PETSCII-inställningar</h2>
+<p>Varje cell får det tecken och den färg som mest liknar originalet – bedömt pixel för pixel och suddat, så som ögat
+ser det.</p>
+<ul>
+<li><b>Tecken:</b> <i>Versaler + grafik</i> eller <i>Gemener + versaler</i> (C64:ans två teckenuppsättningar).</li>
+<li><b>Använd bokstäver och siffror:</b> av = bara grafiktecken, mellanslag och inverterat mellanslag – oftast lugnare.</li>
+<li><b>Detalj:</b> hög = tecknen följer kanter pixel för pixel; låg = bara cellernas ljusstyrka och färg (mjukt).</li>
+<li><b>Diffusion:</b> hur mycket av en cells kvarvarande fel som förs vidare till grannarna (bra för övergångar och ytor).</li>
+<li><b>Lugn:</b> oroliga tecken visas bara där de tydligt hjälper.</li>
+</ul>
+<p><b>Dithering</b> (i gruppen till vänster) går att använda även för PETSCII: en första omgång väljer bakgrunden och för
+varje cell den färg som blandar sig bäst med den. Sedan ditheras bilden med bara dessa två färger per cell, och en andra,
+pixelexakt omgång väljer de tecken som följer dithermönstret – schackrutor och punkttecken återger mellantonerna.
+Ordnad dithering (Bayer) ger lugna, regelbundna mönster; Floyd-Steinberg och Atkinson mer detalj.</p>
+<p>För att redigera en PETSCII-bild vidare: spara som Petmate-fil och öppna den i Petmate.</p>
+
+<a name="charset"></a><h2>Teckenuppsättning och brickor</h2>
+<p>Målet <b>Teckenuppsättning</b> gör om bilden till en egen teckenuppsättning plus en skärm med teckenkoder och färger –
+råmaterialet för demoeffekter (scrollers, brickmotorer, teckenanimationer).</p>
+<ul>
+<li><b>Hires-tecken</b> (8×8 pixlar): en gemensam bakgrund plus en färg (0–15) per cell.
+<b>Multicolor-tecken</b> (4×8 dubbelt så breda pixlar, pixelizer-steget visas): bakgrund, $D022 och $D023 för hela
+skärmen plus en färg 0–7 per cell (i färg-RAM med bit 3 satt).</li>
+<li><b>Max. tecken</b> (2–256): varje cell får först sitt eget exakta tecken. Blir det fler slås de tecken som liknar
+varandra mest ihop (k-means på färgfelet), och varje cell tar den färg som passar det sammanslagna tecknet bäst. Färre
+tecken = mer minne för kod, men en grövre bild.</li>
+<li><b>Metabrickor</b> 1×1, 2×2 eller 4×4: skärmen beskrivs dessutom som en karta av brickor med n×n tecken; identiska
+brickor sparas en gång. Kartan har ⌈40/n⌉×⌈25/n⌉ poster; platser utanför skärmen får det tomma tecknet (kod 0). Med
+fler än 256 brickor använder kartan två byte per post.</li>
+<li><b>Bakgrund</b>, <b>$D022</b>, <b>$D023</b>: automatiskt (bästa färgerna för bilden) eller fast.</li>
+<li><b>Dithering</b> arbetar med varje cells färger.</li>
+</ul>
+<p><b>Spara teckenuppsättning ▾</b> erbjuder tre val. <b>Allt</b> skriver <i>NAME.asm</i> med konstanter (CHAR_COUNT,
+MULTICOLOR, BACKGROUND, MC1, MC2, TILE_SIZE, TILE_COUNT, MAP_COLS, MAP_ROWS, MAP_16BIT) och etiketter med
+<code>.import binary</code>, plus <i>NAME_charset.bin</i>, <i>NAME_screen.bin</i>, <i>NAME_colours.bin</i> och, med
+brickor, <i>NAME_tiles.bin</i>, <i>NAME_tilecolours.bin</i> och <i>NAME_map.bin</i>. Teckenuppsättningen justeras till
+$800, som VIC-kretsen kräver. <b>Bara teckenuppsättningen</b> skriver bara <i>NAME_charset.bin</i>; <b>Bara
+mappningen</b> skriver skärm och färger (med brickor även brickor, brickfärger och karta) – praktiskt när koden som
+använder dem redan finns. <b>Teckenuppsättning som PNG…</b> sparar tecknen som bild (16 per rad); <b>Spara PRG…</b>
+visar skärmen på C64:an (teckenuppsättning på $2000, skärm på $0C00).</p>
+
+<a name="result"></a><h2>Steg 6: Resultat – färgkontroll, korrigering, redigering</h2>
+<p>MuleJ kontrollerar alla 1000 celler. "✔" betyder att varje cell följer reglerna; "✘" visar hur många celler som har
+för många färger.</p>
+<ul>
+<li><b>◀ ▶</b> hoppar till föregående / nästa cell med för många färger. <b>Markera</b> visar dem i förhandsvisningen:
+röd = bryter mot reglerna, gul = korrigerad, cyan = vald cell (bara i förhandsvisningen, aldrig i filer).</li>
+<li><b>Klick i resultatet:</b> <i>Välj cell</i> – ett vänsterklick väljer en cell och visar dess färger med antalet
+pixlar; <i>Måla</i> – ett vänsterklick eller dragning sätter pixlar till den valda färgen.</li>
+<li>För en vald cell: tryck in upp till det tillåtna antalet färger (BG = bakgrund, i multicolor alltid tillåten) och
+<b>Använd färger</b> – varje pixel får den närmaste. <b>Automatiskt</b> väljer de bästa färgerna för cellen,
+<b>Återställ cell</b> kastar dina färger och målade pixlar, <b>Kasta allt</b> gör det för alla celler (efter en fråga).</li>
+<li><b>Korrigera alla</b> ger varje cell med för många färger de färger som återger den bäst – som <i>Automatiskt</i>,
+men för alla konfliktceller på en gång. Därefter kan varje cell fortfarande ändras eller återställas för hand.</li>
+</ul>
+
+<a name="save"></a><h2>Spara</h2>
+<ul>
+<li><b>Spara Koala (.kla)… / Spara Art Studio (.art)… / Spara Petmate… / Spara teckenuppsättning ▾</b> – C64-filen, först
+när färgkontrollen är godkänd. Källbildens mapp föreslås.</li>
+<li><b>Spara PRG…</b> – ett körbart C64-program som visar bilden: <code>LOAD"NAME",8</code> och <code>RUN</code>; valfri
+tangent avslutar.</li>
+<li><b>Detta steg som PNG…</b> – det visade stegets utdata utan markeringar, t.ex. för att redigera den på datorn eller
+mobilen och läsa in den igen senare (välj då det steget i "Börja vid"). Förstoringsfaktorn bredvid underlättar
+redigeringen; MuleJ förminskar bilden exakt igen vid inläsning.</li>
+<li>MuleJ frågar innan en fil skrivs över, och varnar särskilt innan den öppnade bilden skrivs över.</li>
+</ul>
+
+<a name="projects"></a><h2>Projekt</h2>
+<p>Ett <b>projekt</b> håller ihop en bild med alla inställningar och redigeringar, så att du kan fortsätta senare.
+<b>Arkiv ▸ Spara projekt</b> (Ctrl+S, på macOS ⌘S) skapar en mapp med bildens namn i <i>Projekt</i> – bredvid programmet
+om det går att skriva där, annars i <i>Dokument/MuleJ</i>. I den finns projektfilen (<i>namn.mulej</i>), <i>import/</i>
+med en kopia av bilden och <i>export/</i> med alla resultat, som skrivs om vid varje sparande. Finns det redan en mapp med
+det namnet används ”namn (2)”.</p>
+<p>Arkiv-menyn har dessutom <b>Ny</b> (Ctrl+N), <b>Öppna bild</b> (Ctrl+O), <b>Öppna projekt</b> (Ctrl+Shift+O),
+<b>Senast öppnade</b> (de 10 senaste projekten), <b>Spara projekt som</b> (Ctrl+Shift+S), <b>Stäng projekt</b> (Ctrl+W)
+och <b>Öppna projektmappen</b>. Så länge något inte är sparat visar titeln en ”•”; innan ändringar skulle gå förlorade
+(stänga, avsluta, öppna en annan bild eller ett annat projekt) frågar programmet om du vill spara. En nyöppnad bild
+börjar med alla inställningar på standard (bara målet behålls); <i>Avbryt</i> i den frågan lämnar allt som det var.</p>
+
+<a name="preview"></a><h2>Förhandsvisningar, zoom och panorering</h2>
+<ul>
+<li>Mushjul = zoom, dra med höger = panorera, dubbelklick = anpassa. Knappar: −, +, <b>Hela</b> och <b>4×</b>
+(4 skärmpixlar per bildpixel).</li>
+<li><b>Koppla</b> zoomar och panorerar båda förhandsvisningarna tillsammans, <b>Rutnät</b> visar pixel- och
+8×8-cellinjer vid inzoomning, <b>PAL</b> visar 320×200-bilder i en PAL-monitors bildförhållande.</li>
+<li><b>Slutresultat</b> (höger förhandsvisning): visar slutresultatet i stället för det aktuella stegets utdata – så ser
+du direkt vad en inställning i ett tidigt steg gör med slutet.</li>
+<li>Varje grupp har en knapp <b>Standard</b>. Reglage: pilarna flyttar med 1, markeringen visar standardvärdet,
+dubbelklick återställer.</li>
+<li>Språk: menyn <b>Språk</b> – engelska, tyska, nederländska, svenska eller polska. <i>Systemspråk</i> (standard) följer
+din dator – engelska om det inte är något av dessa; ett språk som valts för hand behålls vid nästa start.</li>
+</ul>
+
+<p><b>Ångra:</b> <b>Redigera ▸ Ångra</b> (Ctrl+Z, på macOS ⌘Z) tar tillbaka den senaste ändringen – en inställning,
+utsnittet, startsteget, målet eller en redigering i färgkontrollen (cellfärger, målning, Korrigera alla, Kasta allt);
+<b>Redigera ▸ Gör om</b> (Ctrl+Y, på macOS ⇧⌘Z) gör den igen – upp till 100 steg. Menyn visar vad som ändras. Att dra ett
+reglage eller måla ett penseldrag räknas som ett steg. En nyöppnad bild börjar en ny historik.</p>
+
+<a name="cli"></a><h2>Kommandorad</h2>
+<pre>mulej &lt;kommando&gt; [alternativ] &lt;indata&gt; [utdata]</pre>
+<table border="1" cellspacing="0">
+<tr><th>Kommando</th><th>Gör</th></tr>
+<tr><td><code>palettize</code></td><td>avbildar alla färger på närmaste palettfärg → NAME_palettized.png</td></tr>
+<tr><td><code>pixelize</code></td><td>gör 2×1-multicolorpixlar → NAME_pixelized_l2r.png / _r2l.png</td></tr>
+<tr><td><code>koala</code></td><td>multicolor-bitmapp → NAME.kla</td></tr>
+<tr><td><code>hires</code></td><td>hires-bitmapp → NAME.art</td></tr>
+<tr><td><code>petscii</code></td><td>textskärm → NAME.petmate</td></tr>
+<tr><td><code>chars</code></td><td>teckenuppsättning + skärm (+ brickor) → NAME.asm + NAME_*.bin</td></tr>
+<tr><td><code>check</code></td><td>listar cellerna som bryter mot reglerna för <code>--mode mc|hires</code></td></tr>
+<tr><td><code>topng</code></td><td>C64-bild eller Petmate-fil → NAME.png</td></tr>
+</table>
+<p>Viktiga alternativ: <code>--palette NAMN|FIL</code>, <code>--space euclid|rgb|yuv|hsl</code>,
+<code>--fit stretch|fit|fill|none</code>, <code>--dither NAMN</code>, <code>--strength N</code>, <code>--serpentine</code>,
+<code>--no-bleeding</code>, <code>--bg auto|0..15</code>, <code>--fix-clashes</code>, <code>--preview FIL.png</code>,
+<code>--prg FIL.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
+<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>,
+<code>--mode mc|hires</code>, <code>--max N</code>, <code>--tiles 1|2|4</code>, <code>--mc1/--mc2 auto|0..15</code>,
+<code>--charset-png FIL.png</code>, <code>--only charset|map</code>.
+<code>mulej --help</code> listar alla. Den gamla <code>-if FIL</code>-syntaxen från c64palettizer, c64pixelizer och
+c64koalaverter fungerar fortfarande.</p>
+
+<a name="tips"></a><h2>Tips</h2>
+<ul>
+<li>Pixelgrafik som ritats för C64: börja vid färgkontrollen, använd ingen dithering och korrigera enstaka celler för hand.</li>
+<li>Foton: lite mer kontrast och mättnad, Floyd-Steinberg- eller Atkinson-dithering.</li>
+<li>För många konflikter: slå på <i>Korrigera automatiskt</i> eller prova en fast bakgrundsfärg.</li>
+</ul>
+<p>Återkoppling och felrapporter är välkomna på GitHub: <a href="https://github.com/nanzee73/MuleJ">github.com/nanzee73/MuleJ</a></p>
+</body></html>

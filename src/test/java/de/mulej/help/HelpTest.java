@@ -27,7 +27,8 @@ class HelpTest {
     @Test
     void everyLanguageHasACompleteGuide() throws Exception {
         Set<String> english = find(HelpDialog.load(PREFIX, "en"), "<a name=\"([^\"]+)\">");
-        for (Locale l : java.util.List.of(java.util.Locale.ENGLISH, java.util.Locale.GERMAN)) {
+        assertEquals(5, AppConfig.LIBRARY_LANGUAGES.size());
+        for (Locale l : AppConfig.LIBRARY_LANGUAGES) {
             String lang = l.getLanguage();
             assertTrue(getClass().getResource(PREFIX + "_" + lang + ".html") != null, "guide missing for " + lang);
             String html = HelpDialog.load(PREFIX, lang);

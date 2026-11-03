@@ -36,15 +36,18 @@ class I18nTest {
         return k;
     }
 
-    /** A text MuleJ overrides in English must be overridden in German too, else English would win over the library's German. */
+    /** A text MuleJ overrides in English must be overridden in every language, else English would win over the library's translation. */
     @Test
     void overridesExistInEveryLanguage() throws Exception {
         Set<String> lib = load("/de/c64gfx/swing/i18n/messages.properties").stringPropertyNames();
         Set<String> en = new TreeSet<>(load("/de/mulej/i18n/messages.properties").stringPropertyNames());
         en.retainAll(lib);
-        Set<String> de = load("/de/mulej/i18n/messages_de.properties").stringPropertyNames();
-        en.removeAll(de);
-        assertEquals(Set.of(), en);
+        for (String lang : LANGS) {
+            if (lang.equals("en")) continue;
+            Set<String> missing = new TreeSet<>(en);
+            missing.removeAll(load("/de/mulej/i18n/messages_" + lang + ".properties").stringPropertyNames());
+            assertEquals(Set.of(), missing, lang);
+        }
     }
 
     /**
@@ -60,7 +63,7 @@ class I18nTest {
             I18n.init();
             assertTrue(I18n.followsSystem());
             assertEquals(I18n.systemLocale(), I18n.locale());
-            assertTrue(java.util.List.of("en", "de").contains(I18n.locale().getLanguage()));
+            assertTrue(java.util.List.of("en", "de", "nl", "sv", "pl").contains(I18n.locale().getLanguage()));
             assertEquals(java.util.Locale.ENGLISH, I18n.supported(java.util.Locale.JAPANESE), "fallback is English");
 
             I18n.setLocale(java.util.Locale.GERMAN);
@@ -80,12 +83,43 @@ class I18nTest {
     @Test
     void everyLanguageHasTheSameKeys() throws Exception {
         Set<String> en = keys("messages.properties");
-        Set<String> de = keys("messages_de.properties");
-        Set<String> missing = new TreeSet<>(en);
-        missing.removeAll(de);
-        Set<String> extra = new TreeSet<>(de);
-        extra.removeAll(en);
-        assertEquals(0, missing.size() + extra.size(), "missing in de: " + missing + ", extra in de: " + extra);
+        for (String lang : LANGS) {
+            if (lang.equals("en")) continue;
+            Set<String> other = keys("messages_" + lang + ".properties");
+            Set<String> missing = new TreeSet<>(en);
+            missing.removeAll(other);
+            Set<String> extra = new TreeSet<>(other);
+            extra.removeAll(en);
+            assertEquals(0, missing.size() + extra.size(), "missing in " + lang + ": " + missing + ", extra: " + extra);
+        }
+    }
+
+    /** Every language offered in the menu: English, German, Dutch, Swedish, Polish (as in FlipperJ). */
+    static final java.util.List<String> LANGS = de.c64gfx.swing.AppConfig.LIBRARY_LANGUAGES.stream()
+            .map(java.util.Locale::getLanguage).toList();
+
+    @Test
+    void allFiveLanguagesAreOffered() {
+        assertEquals(Set.of("en", "de", "nl", "sv", "pl"), Set.copyOf(LANGS));
+        assertEquals(Set.copyOf(LANGS), I18n.supportedLocales().stream().map(java.util.Locale::getLanguage)
+                .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    /** The %-placeholders of every own text are the same in every language (else String.format fails). */
+    @Test
+    void placeholdersMatchEnglish() throws Exception {
+        java.util.Properties en = load("/de/mulej/i18n/messages.properties");
+        java.util.regex.Pattern f = java.util.regex.Pattern.compile("%[-#+ 0,(]*\\d*(?:\\.\\d+)?[a-zA-Z%]");
+        for (String lang : LANGS) {
+            if (lang.equals("en")) continue;
+            java.util.Properties p = load("/de/mulej/i18n/messages_" + lang + ".properties");
+            for (String key : en.stringPropertyNames()) {
+                java.util.List<String> a = new java.util.ArrayList<>(), b = new java.util.ArrayList<>();
+                var ma = f.matcher(en.getProperty(key)); while (ma.find()) a.add(ma.group());
+                var mb = f.matcher(p.getProperty(key, "")); while (mb.find()) b.add(mb.group());
+                assertEquals(a, b, lang + " " + key);
+            }
+        }
     }
 
     /** Every literal key used in the sources ("x.y" passed to tr/text/tip/label/titled/...) must exist. */
@@ -122,6 +156,7 @@ class I18nTest {
         for (int i = 0; i < 16; i++) need.add("color." + i);
         for (var m : de.mulej.core.C64Mode.values()) need.add("mode." + m.name());
         for (var d : de.c64gfx.dither.Dither.values()) need.add("dither." + d.name());
+        for (var p : de.mulej.core.CharsetImage.Part.values()) { need.add("save.part." + p.name()); need.add("save.part." + p.name() + ".tip"); }
         need.removeAll(en);
         assertEquals(Set.of(), need);
     }

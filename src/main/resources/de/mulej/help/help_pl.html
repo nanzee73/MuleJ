@@ -1,0 +1,246 @@
+<html><body>
+<h1>MuleJ – Instrukcja</h1>
+<p>MuleJ zamienia dowolny obraz na grafikę C64: obraz <b>multicolor</b> (Koala Painter), obraz <b>hires</b> (Art Studio),
+ekran tekstowy <b>PETSCII</b> (Petmate) lub <b>zestaw znaków</b> z ekranem i metakafelkami do efektów w demach
+(KickAssembler) – zawsze także jako uruchamialny program C64. Sprawdza, czy każda komórka spełnia reguły kolorów C64,
+i potrafi poprawić te, które ich nie spełniają. Wszystko działa również z wiersza poleceń.</p>
+
+<p><b>Spis treści</b></p>
+<ul>
+<li><a href="#quick">Szybki start</a></li>
+<li><a href="#targets">Cele: multicolor, hires, PETSCII, zestaw znaków</a></li>
+<li><a href="#chain">Łańcuch kroków</a></li>
+<li><a href="#input">Otwieranie obrazów i „Zacznij od”</a></li>
+<li><a href="#frame">Krok 2: Kadr</a></li>
+<li><a href="#prepare">Krok 3: Przygotuj</a></li>
+<li><a href="#pixel">Krok 4: Pikselizator</a></li>
+<li><a href="#colours">Krok 5: Kolory</a></li>
+<li><a href="#petscii">Ustawienia PETSCII</a></li>
+<li><a href="#charset">Zestaw znaków i kafelki</a></li>
+<li><a href="#result">Krok 6: Wynik – kontrola kolorów, korekta, edycja</a></li>
+<li><a href="#save">Zapisywanie</a></li>
+<li><a href="#projects">Projekty</a></li>
+<li><a href="#preview">Podglądy, powiększanie i przesuwanie</a></li>
+<li><a href="#cli">Wiersz poleceń</a></li>
+<li><a href="#tips">Wskazówki</a></li>
+</ul>
+
+<a name="quick"></a><h2>Szybki start</h2>
+<ol>
+<li>Wybierz u góry <b>Cel</b>: Multicolor, Hires, PETSCII lub Zestaw znaków.</li>
+<li><b>Otwórz obraz…</b> lub upuść plik na okno. MuleJ ogląda obraz i decyduje, od czego zacząć
+(zob. <a href="#input">Zacznij od</a>).</li>
+<li>Przechodź przez kroki przyciskami <b>Dalej ▶</b> i <b>◀ Wstecz</b> albo kliknij krok na pasku u góry.
+Każdy krok pokazuje po lewej swoje wejście, a po prawej wyjście.</li>
+<li>W ostatnim kroku, <b>Wynik</b>, kontrola kolorów musi zakończyć się powodzeniem. Następnie zapisz plik C64 (.kla, .art,
+Petmate lub zestaw znaków) i/lub uruchamialny <b>PRG</b>.</li>
+</ol>
+
+<a name="targets"></a><h2>Cele</h2>
+<table border="1" cellspacing="0">
+<tr><th>Cel</th><th>Obraz</th><th>Reguły</th><th>Plik</th></tr>
+<tr><td>Multicolor</td><td>160×200, podwójnie szerokie piksele</td><td>na komórkę 4×8 3 kolory plus jeden kolor tła wspólny dla całego obrazu</td><td>Koala Painter (.kla)</td></tr>
+<tr><td>Hires</td><td>320×200</td><td>na komórkę 8×8 2 kolory</td><td>Art Studio (.art)</td></tr>
+<tr><td>PETSCII</td><td>40×25 znaków</td><td>na komórkę 8×8 jeden znak w jednym kolorze plus wspólny kolor tła</td><td>Plik roboczy Petmate (.petmate)</td></tr>
+<tr><td>Zestaw znaków</td><td>40×25 znaków, własny zestaw znaków</td><td>znaki hires: tło plus jeden kolor na komórkę; znaki multicolor: tło, $D022, $D023 plus jeden kolor 0–7 na komórkę; najwyżej 256 (lub mniej) znaków</td><td>Kod źródłowy KickAssembler + pliki .bin</td></tr>
+</table>
+
+<a name="chain"></a><h2>Łańcuch kroków</h2>
+<p>Dwa podglądy pokazują wejście i wyjście bieżącego kroku; ustawienia kroku znajdują się pod nimi. Przeciągnij separator
+między podglądami a ustawieniami, aby zmienić rozmiary – przy każdej zmianie kroku jest on dopasowywany.</p>
+<p><b>1 Oryginał</b> → <b>2 Kadr</b> → <b>3 Przygotuj</b> → <b>4 Pikselizator</b> (tylko bitmapa multicolor lub znaki
+multicolor) → <b>5 Kolory</b> → <b>6 Wynik</b>. Każdy krok pracuje na wyjściu poprzedniego. Gdy zmienisz coś we wczesnym
+kroku, wszystkie późniejsze aktualizują się automatycznie. Krok „pominięty” przekazuje obraz bez zmian; <b>Użyj tego
+kroku</b> włącza go ponownie.</p>
+
+<a name="input"></a><h2>Otwieranie obrazów i „Zacznij od”</h2>
+<p>MuleJ czyta wszystkie popularne formaty PC (PNG, JPEG, GIF, BMP, WebP, TIFF, …) oraz obrazy C64: Koala, Art Studio,
+Advanced Art Studio, Drazpaint, Drazlace, FLI, FLI Graph, AFLI, Gunpaint, Funpaint, NUFLI, MUFLI, MUIFLI i surowe pliki
+FlipperJ. Obrazy C64 są rysowane wybraną paletą; Art Studio, AFLI, NUFLI, MUFLI i MUIFLI ustawiają cel na Hires,
+pozostałe na Multicolor.</p>
+<p><b>Zacznij od</b> decyduje, których kroków obraz jeszcze potrzebuje. <i>Automatycznie</i> ogląda obraz:</p>
+<ul>
+<li>nie 320×200 → start od <i>Kadru</i>;</li>
+<li>320×200 z dowolnymi kolorami → start od <i>Przygotowania</i>;</li>
+<li>kolory C64, ale pary pikseli się różnią (multicolor) → start od <i>Pikselizatora</i>;</li>
+<li>rozmiar i kolory C64 → start od kontroli kolorów (<i>Wynik</i>), nic nie jest zmieniane.</li>
+</ul>
+<p>Wybierz krok ręcznie, jeśli obraz był już przygotowany lub edytowany gdzie indziej. Wszystkie wcześniejsze kroki są
+przekazywane bez zmian.</p>
+
+<a name="frame"></a><h2>Krok 2: Kadr</h2>
+<p>Wybierz fragment 320×200 obrazu: przeciągnij wewnątrz ramki, aby ją przesunąć, przeciągnij róg, aby zmienić rozmiar,
+przeciągnij na zewnątrz, aby narysować nową; kółko myszy = powiększenie, przeciąganie prawym lub środkowym = przesuwanie,
+dwuklik = cały obraz.</p>
+<ul>
+<li><b>Proporcje obrazu</b> wyniku (C64 PAL, kwadratowe piksele, NTSC lub dowolne) i <b>Zablokuj proporcje kadru</b>.</li>
+<li><b>Skalowanie:</b> Rozciągnij, Dopasuj (z marginesami, zob. <b>Kolor marginesu…</b>), Wypełnij (przycięcie) lub 1:1.
+<b>Kadr 320×200 (1:1)</b> bierze dokładnie 320×200 pikseli bez skalowania – kliknięcie przesuwa tam ramkę.</li>
+<li><b>Filtr:</b> średnia powierzchniowa (gładko) dla zdjęć, najbliższy sąsiad dla pixel artu.</li>
+<li><b>Cały obraz</b> i <b>Maks. wyśrodkowany kadr</b> to skróty; X, Y, Szerokość i Wysokość ustawiają ramkę dokładnie.</li>
+</ul>
+
+<a name="prepare"></a><h2>Krok 3: Przygotuj</h2>
+<p><b>Kontrast</b> i <b>Jasność</b> (od -100 do 100), <b>Gamma %</b> (poniżej 100 = jaśniejsze półtony) oraz
+<b>Nasycenie %</b> (0 = szarość). C64 ma mało ciemnych i mało nasyconych kolorów, więc odrobina więcej kontrastu
+i nasycenia często pomaga.</p>
+
+<a name="pixel"></a><h2>Krok 4: Pikselizator (tylko multicolor)</h2>
+<p>Krok pojawia się dla obrazów multicolor i dla zestawów znaków ze znakami multicolor.</p>
+<p>Piksele multicolor są dwa razy szersze, więc każda para pikseli staje się jednym. To, który piksel zostaje, decyduje
+o wyglądzie cienkich linii:</p>
+<ul>
+<li><b>Lewy → prawy:</b> zostaje lewy piksel każdej pary.</li>
+<li><b>Prawy → lewy:</b> zostaje prawy piksel.</li>
+</ul>
+
+<a name="colours"></a><h2>Krok 5: Kolory</h2>
+<ul>
+<li><b>Paleta:</b> jakie kolory RGB ma 16 kolorów C64 (Colodore, Pepto, DeeKay, …). <b>Własna…</b> otwiera edytor palety:
+zmiana kolorów, wczytywanie plików .vpl/.gpl/hex, zapis jako .vpl.</li>
+<li><b>Dopasowanie:</b> jak mierzone jest „podobieństwo” – <i>RGB euklidesowe</i> (jak w starym c64palettizer),
+<i>RGB ważone</i>, <i>YUV</i> lub <i>HSL</i>.</li>
+<li><b>Dithering</b> (Floyd-Steinberg, Atkinson, Jarvis, Stucki, Sierra Lite, Bayer 2×2/4×4/8×8) miesza kolory w drobne
+wzory. <b>Siła</b> określa, jak bardzo; <b>Wężykowo (serpentyna)</b> zapobiega ukośnym wzorom. Dithering działa dla
+każdego celu: dla PETSCII i zestawów znaków używa kolorów wybranych dla każdej komórki.</li>
+<li><b>Przenikanie (przez granice komórek):</b> błąd ditheringu może przechodzić do sąsiednich komórek – gładziej, ale
+krawędzie komórek są mniej czyste.</li>
+<li><b>Tło:</b> automatyczne (najlepszy kolor) lub stałe (multicolor i PETSCII).</li>
+<li><b>Koryguj automatycznie:</b> komórki ze zbyt wieloma kolorami dostają kolory, które najlepiej je oddają.
+Z ditheringiem wynik zawsze spełnia reguły.</li>
+</ul>
+
+<a name="petscii"></a><h2>Ustawienia PETSCII</h2>
+<p>Każda komórka dostaje znak i kolor najbardziej podobne do oryginału – oceniane piksel po pikselu i po rozmyciu, tak jak
+widzi to oko.</p>
+<ul>
+<li><b>Znaki:</b> <i>Wielkie litery + grafika</i> lub <i>Małe + wielkie litery</i> (dwa zestawy znaków C64).</li>
+<li><b>Używaj liter i cyfr:</b> wył. = tylko znaki graficzne, spacja i odwrócona spacja – zwykle spokojniej.</li>
+<li><b>Szczegóły:</b> wysoko = znaki podążają za krawędziami piksel po pikselu; nisko = tylko jasność i kolor komórek
+(miękko).</li>
+<li><b>Dyfuzja:</b> ile pozostałego błędu komórki przechodzi na sąsiadów (dobre dla przejść tonalnych i płaszczyzn).</li>
+<li><b>Spokój:</b> niespokojne znaki pojawiają się tylko tam, gdzie wyraźnie pomagają.</li>
+</ul>
+<p><b>Dithering</b> (w grupie po lewej) jest dostępny również dla PETSCII: pierwszy przebieg wybiera tło i dla każdej
+komórki kolor, który najlepiej się z nim miesza. Następnie obraz jest ditherowany tylko tymi dwoma kolorami na komórkę,
+a drugi, dokładny co do piksela przebieg wybiera znaki podążające za wzorem ditheringu – znaki szachownicy i kropek oddają
+półtony. Dithering uporządkowany (Bayer) daje spokojne, regularne wzory; Floyd-Steinberg i Atkinson więcej szczegółów.</p>
+<p>Aby dalej edytować obraz PETSCII, zapisz go jako plik Petmate i otwórz w Petmate.</p>
+
+<a name="charset"></a><h2>Zestaw znaków i kafelki</h2>
+<p>Cel <b>Zestaw znaków</b> zamienia obraz we własny zestaw znaków plus ekran z kodami znaków i kolorami – surowy materiał
+do efektów w demach (scrollery, silniki kafelkowe, animacje znakowe).</p>
+<ul>
+<li><b>Znaki hires</b> (8×8 pikseli): wspólne tło plus jeden kolor (0–15) na komórkę.
+<b>Znaki multicolor</b> (4×8 podwójnie szerokich pikseli, pojawia się krok pikselizatora): tło, $D022 i $D023 dla całego
+ekranu plus jeden kolor 0–7 na komórkę (w pamięci kolorów z ustawionym bitem 3).</li>
+<li><b>Maks. znaków</b> (2–256): każda komórka dostaje najpierw własny dokładny znak. Jeśli jest ich więcej, najbardziej
+podobne znaki są łączone (k-means na błędzie koloru), a każda komórka bierze kolor najlepiej pasujący do połączonego
+znaku. Mniej znaków = więcej pamięci na kod, ale grubszy obraz.</li>
+<li><b>Metakafelki</b> 1×1, 2×2 lub 4×4: ekran jest dodatkowo opisany jako mapa kafelków n×n znaków; identyczne kafelki
+są zapisywane raz. Mapa ma ⌈40/n⌉×⌈25/n⌉ pozycji; miejsca poza ekranem dostają pusty znak (kod 0). Przy ponad 256
+kafelkach mapa używa dwóch bajtów na pozycję.</li>
+<li><b>Tło</b>, <b>$D022</b>, <b>$D023</b>: automatycznie (najlepsze kolory dla obrazu) lub stałe.</li>
+<li><b>Dithering</b> działa z kolorami każdej komórki.</li>
+</ul>
+<p><b>Zapisz zestaw znaków ▾</b> daje trzy możliwości. <b>Wszystko</b> zapisuje <i>NAME.asm</i> ze stałymi (CHAR_COUNT,
+MULTICOLOR, BACKGROUND, MC1, MC2, TILE_SIZE, TILE_COUNT, MAP_COLS, MAP_ROWS, MAP_16BIT) i etykietami z
+<code>.import binary</code>, plus <i>NAME_charset.bin</i>, <i>NAME_screen.bin</i>, <i>NAME_colours.bin</i> oraz, z
+kafelkami, <i>NAME_tiles.bin</i>, <i>NAME_tilecolours.bin</i> i <i>NAME_map.bin</i>. Zestaw znaków jest wyrównany do
+$800, jak wymaga tego VIC. <b>Tylko zestaw znaków</b> zapisuje tylko <i>NAME_charset.bin</i>; <b>Tylko mapowanie</b>
+zapisuje ekran i kolory (z kafelkami także kafelki, kolory kafelków i mapę) – przydatne, gdy kod, który ich używa, już
+istnieje. <b>Zestaw znaków jako PNG…</b> zapisuje znaki jako obraz (16 w rzędzie); <b>Zapisz PRG…</b> pokazuje ekran na
+C64 (zestaw znaków pod $2000, ekran pod $0C00).</p>
+
+<a name="result"></a><h2>Krok 6: Wynik – kontrola kolorów, korekta, edycja</h2>
+<p>MuleJ sprawdza wszystkie 1000 komórek. „✔” oznacza, że każda komórka spełnia reguły; „✘” pokazuje, ile komórek ma
+zbyt wiele kolorów.</p>
+<ul>
+<li><b>◀ ▶</b> przechodzą do poprzedniej / następnej komórki ze zbyt wieloma kolorami. <b>Zaznacz</b> pokazuje je w podglądzie:
+czerwony = łamie reguły, żółty = poprawiony, cyjan = wybrana komórka (tylko w podglądzie, nigdy w plikach).</li>
+<li><b>Kliknięcie w wynik:</b> <i>Wybierz komórkę</i> – lewy klik wybiera komórkę i pokazuje jej kolory z liczbą pikseli;
+<i>Maluj</i> – lewy klik lub przeciąganie ustawia piksele na wybrany kolor.</li>
+<li>Dla wybranej komórki: wciśnij dozwoloną liczbę kolorów (TŁO zawsze dozwolone w multicolor) i <b>Zastosuj kolory</b> –
+każdy piksel dostaje najbliższy z nich. <b>Automatycznie</b> wybiera najlepsze kolory dla tej komórki,
+<b>Resetuj komórkę</b> odrzuca twoje kolory i namalowane piksele, <b>Odrzuć wszystko</b> robi to dla każdej komórki (po
+pytaniu).</li>
+<li><b>Popraw wszystkie</b> daje każdej komórce ze zbyt wieloma kolorami kolory, które najlepiej ją oddają – jak
+<i>Automatycznie</i>, ale dla wszystkich komórek z konfliktem naraz. Potem każdą komórkę można nadal zmienić lub
+zresetować ręcznie.</li>
+</ul>
+
+<a name="save"></a><h2>Zapisywanie</h2>
+<ul>
+<li><b>Zapisz Koala (.kla)… / Zapisz Art Studio (.art)… / Zapisz Petmate… / Zapisz zestaw znaków ▾</b> – plik C64,
+dopiero po zaliczonej kontroli kolorów. Proponowany jest folder obrazu źródłowego.</li>
+<li><b>Zapisz PRG…</b> – uruchamialny program C64 pokazujący obraz: <code>LOAD"NAME",8</code> i <code>RUN</code>;
+dowolny klawisz go kończy.</li>
+<li><b>Ten krok jako PNG…</b> – wyjście pokazanego kroku bez znaczników, np. aby edytować je na komputerze lub telefonie
+i później wczytać ponownie (wybierz wtedy ten krok w „Zacznij od”). Współczynnik powiększenia obok ułatwia edycję;
+MuleJ przy wczytaniu dokładnie zmniejsza obraz z powrotem.</li>
+<li>MuleJ pyta przed nadpisaniem pliku, a szczególnie ostrzega przed nadpisaniem otwartego obrazu.</li>
+</ul>
+
+<a name="projects"></a><h2>Projekty</h2>
+<p><b>Projekt</b> łączy obraz ze wszystkimi ustawieniami i zmianami, abyś mógł kontynuować później.
+<b>Plik ▸ Zapisz projekt</b> (Ctrl+S, w macOS ⌘S) tworzy w <i>Projekty</i> folder z nazwą obrazu – obok programu, jeśli
+można tam zapisywać, w przeciwnym razie w <i>Dokumenty/MuleJ</i>. W środku są plik projektu (<i>nazwa.mulej</i>),
+<i>import/</i> z kopią obrazu i <i>eksport/</i> ze wszystkimi wynikami, zapisywanymi od nowa przy każdym zapisie. Jeśli
+folder o tej nazwie już istnieje, używana jest „nazwa (2)”.</p>
+<p>Menu Plik zawiera ponadto <b>Nowy</b> (Ctrl+N), <b>Otwórz obraz</b> (Ctrl+O), <b>Otwórz projekt</b> (Ctrl+Shift+O),
+<b>Ostatnio otwierane</b> (10 ostatnich projektów), <b>Zapisz projekt jako</b> (Ctrl+Shift+S), <b>Zamknij projekt</b>
+(Ctrl+W) i <b>Otwórz folder projektu</b>. Dopóki są niezapisane zmiany, tytuł pokazuje „•”; zanim zmiany zostałyby
+utracone (zamknięcie, wyjście, otwarcie innego obrazu lub projektu), program pyta, czy zapisać. Nowo otwarty obraz zaczyna
+ze wszystkimi ustawieniami domyślnymi (zostaje tylko cel); <i>Anuluj</i> w tym pytaniu pozostawia wszystko bez zmian.</p>
+
+<a name="preview"></a><h2>Podglądy, powiększanie i przesuwanie</h2>
+<ul>
+<li>Kółko myszy = powiększenie, przeciąganie prawym = przesuwanie, dwuklik = dopasuj. Przyciski: −, +, <b>Całość</b>
+i <b>4×</b> (4 piksele ekranu na piksel obrazu).</li>
+<li><b>Połącz</b> powiększa i przesuwa oba podglądy razem, <b>Siatka</b> pokazuje po powiększeniu linie pikseli i komórek
+8×8, <b>PAL</b> pokazuje obrazy 320×200 w proporcjach monitora PAL.</li>
+<li><b>Wynik końcowy</b> (prawy podgląd): pokazuje wynik końcowy zamiast wyjścia bieżącego kroku – od razu widać, co
+ustawienie we wczesnym kroku zmienia na końcu.</li>
+<li>Każda grupa ma przycisk <b>Domyślne</b>. Suwaki: strzałki przesuwają o 1, znacznik pokazuje wartość domyślną,
+dwuklik przywraca.</li>
+<li>Język: menu <b>Język</b> – angielski, niemiecki, niderlandzki, szwedzki lub polski. <i>Język systemu</i> (domyślnie)
+podąża za komputerem – angielski, jeśli to żaden z nich; język wybrany ręcznie zostaje przy następnym uruchomieniu.</li>
+</ul>
+
+<p><b>Cofnij:</b> <b>Edycja ▸ Cofnij</b> (Ctrl+Z, w macOS ⌘Z) wycofuje ostatnią zmianę – ustawienie, kadr, krok
+początkowy, cel lub edycję w kontroli kolorów (kolory komórek, malowanie, Popraw wszystkie, Odrzuć wszystko);
+<b>Edycja ▸ Ponów</b> (Ctrl+Y, w macOS ⇧⌘Z) wykonuje ją ponownie – do 100 kroków. Menu podaje, co się zmienia.
+Przeciągnięcie suwaka lub pociągnięcie pędzlem liczy się jako jeden krok. Wczytanie nowego obrazu rozpoczyna nową
+historię.</p>
+
+<a name="cli"></a><h2>Wiersz poleceń</h2>
+<pre>mulej &lt;polecenie&gt; [opcje] &lt;wejście&gt; [wyjście]</pre>
+<table border="1" cellspacing="0">
+<tr><th>Polecenie</th><th>Działanie</th></tr>
+<tr><td><code>palettize</code></td><td>zamienia wszystkie kolory na najbliższy kolor palety → NAME_palettized.png</td></tr>
+<tr><td><code>pixelize</code></td><td>tworzy piksele multicolor 2×1 → NAME_pixelized_l2r.png / _r2l.png</td></tr>
+<tr><td><code>koala</code></td><td>bitmapa multicolor → NAME.kla</td></tr>
+<tr><td><code>hires</code></td><td>bitmapa hires → NAME.art</td></tr>
+<tr><td><code>petscii</code></td><td>ekran tekstowy → NAME.petmate</td></tr>
+<tr><td><code>chars</code></td><td>zestaw znaków + ekran (+ kafelki) → NAME.asm + NAME_*.bin</td></tr>
+<tr><td><code>check</code></td><td>wypisuje komórki łamiące reguły <code>--mode mc|hires</code></td></tr>
+<tr><td><code>topng</code></td><td>obraz C64 lub plik Petmate → NAME.png</td></tr>
+</table>
+<p>Ważne opcje: <code>--palette NAZWA|PLIK</code>, <code>--space euclid|rgb|yuv|hsl</code>,
+<code>--fit stretch|fit|fill|none</code>, <code>--dither NAZWA</code>, <code>--strength N</code>, <code>--serpentine</code>,
+<code>--no-bleeding</code>, <code>--bg auto|0..15</code>, <code>--fix-clashes</code>, <code>--preview PLIK.png</code>,
+<code>--prg PLIK.prg</code>, <code>--contrast/--brightness/--gamma/--saturation N</code>,
+<code>--charset upper|lower</code>, <code>--text</code>, <code>--detail/--diffusion/--calm N</code>,
+<code>--mode mc|hires</code>, <code>--max N</code>, <code>--tiles 1|2|4</code>, <code>--mc1/--mc2 auto|0..15</code>,
+<code>--charset-png PLIK.png</code>, <code>--only charset|map</code>.
+<code>mulej --help</code> wypisuje wszystkie. Stara składnia <code>-if PLIK</code> z c64palettizer, c64pixelizer
+i c64koalaverter nadal działa.</p>
+
+<a name="tips"></a><h2>Wskazówki</h2>
+<ul>
+<li>Pixel art rysowany dla C64: zacznij od kontroli kolorów, nie używaj ditheringu i poprawiaj pojedyncze komórki ręcznie.</li>
+<li>Zdjęcia: odrobina więcej kontrastu i nasycenia, dithering Floyd-Steinberg lub Atkinson.</li>
+<li>Zbyt wiele konfliktów: włącz <i>Koryguj automatycznie</i> lub spróbuj stałego koloru tła.</li>
+</ul>
+<p>Uwagi i zgłoszenia błędów są mile widziane na GitHubie: <a href="https://github.com/nanzee73/MuleJ">github.com/nanzee73/MuleJ</a></p>
+</body></html>

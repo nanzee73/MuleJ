@@ -117,7 +117,7 @@ Saving (*Save character set ▾*: everything, only the character set, or only th
 * **Save Koala / Art Studio / Petmate / KickAssembler…** and **Save PRG…** (only once the colour check has passed) start in the folder of
   the source picture. The PRG shows the picture after `LOAD"NAME",8` and `RUN`; any key returns to BASIC.
 
-English and German user interface (*Language* menu, no restart needed). By default MuleJ follows the system language (English if it is neither English nor German); a language chosen by hand is remembered.
+User interface and user guide in English, German, Dutch, Swedish and Polish, as in FlipperJ (*Language* menu, no restart needed). By default MuleJ follows the system language (English if it is none of these); a language chosen by hand is remembered.
 
 ## Command line
 

@@ -5,8 +5,6 @@ import de.mulej.gui.MainWindow;
 import de.c64gfx.swing.AppConfig;
 
 import javax.swing.*;
-import java.util.List;
-import java.util.Locale;
 
 /** Entry point: without arguments the GUI starts, with arguments the command line tools run. */
 public final class App {
@@ -24,7 +22,8 @@ public final class App {
     /** Tells C64GfxLib the app name, settings node, icons and texts. Call before anything else. */
     public static void configure() {
         AppConfig.install(new AppConfig(NAME, "de/mulej", "/de/mulej/icons/mulej-",
-                "de.mulej.i18n.messages", List.of(Locale.ENGLISH, Locale.GERMAN), true));   // follows the system language until one is chosen
+                "de.mulej.i18n.messages", AppConfig.LIBRARY_LANGUAGES, true));   // en, de, nl, sv, pl like FlipperJ;
+                                                                                 // follows the system language until one is chosen
     }
 
     public static void main(String[] args) {
