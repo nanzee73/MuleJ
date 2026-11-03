@@ -18,6 +18,7 @@ en kan de cellen corrigeren die dat niet doen. Alles werkt ook op de opdrachtreg
 <li><a href="#petscii">PETSCII-instellingen</a></li>
 <li><a href="#charset">Tekenset en tegels</a></li>
 <li><a href="#result">Stap 6: Resultaat – kleurcontrole, correctie, bewerken</a></li>
+<li><a href="#swap">Kleuren wisselen</a></li>
 <li><a href="#save">Opslaan</a></li>
 <li><a href="#projects">Projecten</a></li>
 <li><a href="#preview">Voorbeelden, zoomen en verschuiven</a></li>
@@ -170,6 +171,20 @@ vraag).</li>
 <li><b>Alles corrigeren</b> geeft elke cel met te veel kleuren de kleuren die haar het best weergeven – zoals
 <i>Automatisch</i>, maar voor alle conflictcellen tegelijk. Daarna kan elke cel nog met de hand worden aangepast of
 teruggezet.</li>
+</ul>
+
+<a name="swap"></a><h2>Kleuren wisselen</h2>
+<p>Onder de kleurcontrole verandert <b>Kleuren wisselen</b> kleuren van de afgewerkte afbeelding – voor elk doel. Boven
+staan de kleuren van het resultaat met hun aantal pixels, onder de 16 C64-kleuren.</p>
+<ul>
+<li>Kies boven een kleur en onder de nieuwe kleur. <b>Wisselen ⇄</b> verwisselt beide overal; <b>Vervangen →</b> toont de
+nieuwe kleur overal waar de gekozen kleur staat (beide worden één).</li>
+<li>Wijzigingen zijn te combineren; de regel eronder toont ze (bijv. “6 → 14, 14 → 6”). <b>Oorspronkelijke kleuren</b>
+draait ze allemaal terug, <b>Bewerken ▸ Ongedaan maken</b> de laatste. Ze worden in het project bewaard.</li>
+<li>Het wisselen komt als laatste, na de kleurcontrole en je correcties, en komt in elk opgeslagen bestand en PRG. Het
+houdt zich aan de C64-regels, omdat geen cel meer kleuren krijgt. Bij multicolor-bitmaps gaat de achtergrond mee.</li>
+<li>Bitmaps: kleuren worden pas gewisseld als de kleurcontrole geslaagd is. Multicolor-tekens: cellen kunnen alleen de
+kleuren 0–7 gebruiken – cellen waarvan de nieuwe kleur 8–15 zou zijn, houden hun kleur (de regel eronder zegt hoeveel).</li>
 </ul>
 
 <a name="save"></a><h2>Opslaan</h2>

@@ -18,6 +18,7 @@ i potrafi poprawić te, które ich nie spełniają. Wszystko działa również z
 <li><a href="#petscii">Ustawienia PETSCII</a></li>
 <li><a href="#charset">Zestaw znaków i kafelki</a></li>
 <li><a href="#result">Krok 6: Wynik – kontrola kolorów, korekta, edycja</a></li>
+<li><a href="#swap">Zamiana kolorów</a></li>
 <li><a href="#save">Zapisywanie</a></li>
 <li><a href="#projects">Projekty</a></li>
 <li><a href="#preview">Podglądy, powiększanie i przesuwanie</a></li>
@@ -167,6 +168,20 @@ pytaniu).</li>
 <li><b>Popraw wszystkie</b> daje każdej komórce ze zbyt wieloma kolorami kolory, które najlepiej ją oddają – jak
 <i>Automatycznie</i>, ale dla wszystkich komórek z konfliktem naraz. Potem każdą komórkę można nadal zmienić lub
 zresetować ręcznie.</li>
+</ul>
+
+<a name="swap"></a><h2>Zamiana kolorów</h2>
+<p>Pod kontrolą kolorów <b>Zamiana kolorów</b> zmienia kolory gotowego obrazu – dla każdego celu. U góry są kolory wyniku
+z liczbą pikseli, na dole 16 kolorów C64.</p>
+<ul>
+<li>Wybierz kolor u góry i nowy kolor na dole. <b>Zamień ⇄</b> zamienia oba miejscami wszędzie; <b>Zastąp →</b> pokazuje
+nowy kolor wszędzie tam, gdzie jest wybrany (oba stają się jednym).</li>
+<li>Zmiany można łączyć; wiersz poniżej je pokazuje (np. „6 → 14, 14 → 6”). <b>Kolory oryginalne</b> cofa wszystkie,
+<b>Edycja ▸ Cofnij</b> ostatnią. Są zapisywane w projekcie.</li>
+<li>Zamiana jest stosowana na końcu, po kontroli kolorów i twoich poprawkach, i trafia do każdego zapisanego pliku i PRG.
+Zachowuje reguły C64, bo żadna komórka nie dostaje więcej kolorów. W bitmapach multicolor tło zmienia się razem z nią.</li>
+<li>Bitmapy: kolory są zamieniane dopiero po zaliczonej kontroli kolorów. Znaki multicolor: komórki mogą używać tylko
+kolorów 0–7 – komórki, których nowy kolor byłby 8–15, zachowują swój kolor (wiersz poniżej podaje, ile ich jest).</li>
 </ul>
 
 <a name="save"></a><h2>Zapisywanie</h2>

@@ -18,6 +18,7 @@ cell keeps the C64 colour rules and can fix the cells that don't. Everything als
 <li><a href="#petscii">PETSCII settings</a></li>
 <li><a href="#charset">Character set & tiles</a></li>
 <li><a href="#result">Step 6: Result – colour check, correction, editing</a></li>
+<li><a href="#swap">Swapping colours</a></li>
 <li><a href="#save">Saving</a></li>
 <li><a href="#projects">Projects</a></li>
 <li><a href="#preview">Previews, zoom and pan</a></li>
@@ -162,6 +163,20 @@ pixels; <i>Paint</i> – a left click or drag sets pixels to the chosen colour.<
 <b>Reset cell</b> discards your colours and painted pixels, <b>Discard all</b> does so for every cell (after asking).</li>
 <li><b>Fix all</b> gives every cell with too many colours the colours that reproduce it best – like <i>Automatic</i> for
 each conflict cell at once. Afterwards every cell can still be changed or reset by hand.</li>
+</ul>
+
+<a name="swap"></a><h2>Swapping colours</h2>
+<p>Below the colour check, <b>Swap colours</b> changes colours of the finished picture – for every target. Above are the
+colours of the result with their number of pixels, below the 16 C64 colours.</p>
+<ul>
+<li>Choose a colour above and a new colour below. <b>Swap ⇄</b> exchanges both everywhere; <b>Replace →</b> shows the new
+colour wherever the chosen one is (the two become one).</li>
+<li>Changes can be combined; the line below shows them (e.g. “6 → 14, 14 → 6”). <b>Original colours</b> undoes all of
+them, <b>Edit ▸ Undo</b> the last one. They are kept in the project.</li>
+<li>Swapping comes last, after the colour check and your corrections, and goes into every saved file and PRG. It keeps the
+C64 rules, since no cell gets more colours. With multicolour bitmaps the background follows the swap.</li>
+<li>Bitmaps: colours are only swapped once the colour check has passed. Multicolour characters: cells can only use colours
+0–7 – cells whose new colour would be 8–15 keep their colour (the line below says how many).</li>
 </ul>
 
 <a name="save"></a><h2>Saving</h2>

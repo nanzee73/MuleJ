@@ -77,10 +77,19 @@ public final class Pipeline {
                          Pixelizer.Direction pair, Palette palette, ColorMatcher.Space space,
                          Ditherer.Settings dither, int background, boolean fixClashes,
                          PetsciiConverter.Settings petscii, CharsetConverter.Settings charset,
-                         BitmapConverter.Edits edits) {
+                         BitmapConverter.Edits edits, ColourMap colourMap) {
 
         public Params {
             if (charset == null) charset = CharsetConverter.Settings.defaults();
+            if (colourMap == null) colourMap = ColourMap.identity();
+        }
+
+        /** Without swapped colours. */
+        public Params(Target target, Step entry, ImageFitter.Settings fit, ImageAdjust.Settings adjust,
+                      Pixelizer.Direction pair, Palette palette, ColorMatcher.Space space,
+                      Ditherer.Settings dither, int background, boolean fixClashes,
+                      PetsciiConverter.Settings petscii, CharsetConverter.Settings charset, BitmapConverter.Edits edits) {
+            this(target, entry, fit, adjust, pair, palette, space, dither, background, fixClashes, petscii, charset, edits, null);
         }
 
         /** Without the character set settings (they get their defaults). */
@@ -88,13 +97,14 @@ public final class Pipeline {
                       Pixelizer.Direction pair, Palette palette, ColorMatcher.Space space,
                       Ditherer.Settings dither, int background, boolean fixClashes,
                       PetsciiConverter.Settings petscii, BitmapConverter.Edits edits) {
-            this(target, entry, fit, adjust, pair, palette, space, dither, background, fixClashes, petscii, null, edits);
+            this(target, entry, fit, adjust, pair, palette, space, dither, background, fixClashes, petscii, null, edits, null);
         }
 
         public static Params defaults(Target t) {
             return new Params(t, Step.FRAME, null, ImageAdjust.Settings.NEUTRAL, Pixelizer.Direction.L2R,
                     Palettes.COLODORE, ColorMatcher.Space.EUCLID, Ditherer.Settings.NONE, -1, false,
-                    PetsciiConverter.Settings.defaults(), CharsetConverter.Settings.defaults(), BitmapConverter.Edits.none());
+                    PetsciiConverter.Settings.defaults(), CharsetConverter.Settings.defaults(), BitmapConverter.Edits.none(),
+                    ColourMap.identity());
         }
 
         public List<Step> steps() { return Pipeline.steps(target, charset.multicolor()); }
@@ -153,14 +163,17 @@ public final class Pipeline {
                 : p.skipped(Step.PIXELIZER) ? prepared : Pixelizer.pixelize(prepared, p.pair());
         try {
             if (p.target() == Target.PETSCII) {
-                PetsciiImage pet = PetsciiConverter.convert(pixelized, p.palette(), p.space(), p.petscii());
+                PetsciiImage pet = p.colourMap().apply(PetsciiConverter.convert(pixelized, p.palette(), p.space(), p.petscii()));
                 return new Outputs(src, framed, prepared, pixelized, null, pet, null, pet.render(p.palette()), null);
             }
             if (p.target() == Target.CHARSET) {
-                CharsetImage c = CharsetConverter.convert(pixelized, p.palette(), p.space(), p.charset(), p.dither());
+                CharsetImage c = p.colourMap().apply(
+                        CharsetConverter.convert(pixelized, p.palette(), p.space(), p.charset(), p.dither()));
                 return new Outputs(src, framed, prepared, pixelized, null, null, c, c.render(p.palette()), null);
             }
-            BitmapConverter.Result r = BitmapConverter.convert(pixelized, bitmapSettings(p), p.edits());
+            BitmapConverter.Settings bs = bitmapSettings(p);
+            // swapped colours come last, after the colour check and its corrections
+            BitmapConverter.Result r = p.colourMap().apply(BitmapConverter.convert(pixelized, bs, p.edits()), bs);
             return new Outputs(src, framed, prepared, pixelized, r, null, null, r.render(p.palette()), null);
         } catch (Exception e) {
             return new Outputs(src, framed, prepared, pixelized, null, null, null, null, e.getMessage());

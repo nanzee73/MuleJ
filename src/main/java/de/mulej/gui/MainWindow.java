@@ -128,6 +128,14 @@ public class MainWindow extends JFrame {
     /** Text of {@link #petsciiInfo}, built again when the language changes. */
     private Supplier<String> infoText = () -> "";
     private JPanel bitmapResult, petsciiResult;
+    // colour swap (result step, every target)
+    private ColourMap colourMap = ColourMap.identity();
+    private final JToggleButton[] swapFrom = new JToggleButton[16], swapTo = new JToggleButton[16];
+    private final JButton swapButton = I18n.tip(I18n.text(new JButton(), "swap.swap"), "swap.swap.tip");
+    private final JButton replaceButton = I18n.tip(I18n.text(new JButton(), "swap.replace"), "swap.replace.tip");
+    private final JButton swapReset = I18n.tip(I18n.text(new JButton(), "swap.reset"), "swap.reset.tip");
+    private final JLabel swapInfo = new JLabel(" ");
+    private final ButtonGroup swapFromGroup = new ButtonGroup(), swapToGroup = new ButtonGroup();
     private final JButton saveCharsetPngButton = I18n.tip(I18n.text(new JButton(), "save.charsetPng"), "save.charsetPng.tip");
     private final Map<Integer, int[]> cellEdits = new HashMap<>();
     private final Map<Integer, Integer> pixelEdits = new HashMap<>();
@@ -442,6 +450,7 @@ public class MainWindow extends JFrame {
         c = gbc();
         c.gridy = 0; c.weightx = 1; result.add(bitmapResult = buildBitmapResult(), c);
         c.gridy = 1; result.add(petsciiResult = buildPetsciiResult(), c);
+        c.gridy = 2; result.add(buildColourSwap(), c);
         addGlue(result);
         stepPanels.put(Step.RESULT, result);
 
@@ -680,6 +689,123 @@ public class MainWindow extends JFrame {
         toolSelect.addActionListener(e -> updateEnabled());
         toolPaint.addActionListener(e -> updateEnabled());
         return p;
+    }
+
+    /** Swap or replace colours of the finished picture (applied last, for every target). */
+    private JPanel buildColourSwap() {
+        JPanel p = group("swap.group");
+        ButtonGroup gf = swapFromGroup, gt = swapToGroup;
+        JPanel from = new JPanel(new GridLayout(1, 16, 2, 2)), to = new JPanel(new GridLayout(1, 16, 2, 2));
+        for (int i = 0; i < 16; i++) {
+            swapFrom[i] = swatchButton();
+            swapTo[i] = swatchButton();
+            gf.add(swapFrom[i]);
+            gt.add(swapTo[i]);
+            from.add(swapFrom[i]);
+            to.add(swapTo[i]);
+            swapFrom[i].addActionListener(e -> updateSwapButtons());
+            swapTo[i].addActionListener(e -> updateSwapButtons());
+        }
+        JPanel buttons = new JPanel(new GridLayout(3, 1, 3, 3));
+        buttons.add(swapButton);
+        buttons.add(replaceButton);
+        buttons.add(swapReset);
+        GridBagConstraints c = gbc();
+        c.gridy = 0; c.gridx = 0; p.add(fixedLabel("swap.from"), c);
+        c.gridx = 1; c.weightx = 1; p.add(from, c);
+        c.gridy = 1; c.gridx = 0; c.weightx = 0; p.add(fixedLabel("swap.to"), c);
+        c.gridx = 1; c.weightx = 1; p.add(to, c);
+        c.gridy = 2; c.gridx = 0; c.gridwidth = 2; p.add(swapInfo, c);
+        c.gridy = 0; c.gridx = 2; c.gridwidth = 1; c.gridheight = 3; c.weightx = 0; p.add(buttons, c);
+        swapButton.addActionListener(e -> changeColours(true));
+        replaceButton.addActionListener(e -> changeColours(false));
+        swapReset.addActionListener(e -> {
+            colourMap = ColourMap.identity();
+            changed(Step.COLOURS);
+        });
+        return p;
+    }
+
+    private static JToggleButton swatchButton() {
+        JToggleButton b = new JToggleButton();
+        b.setMargin(new Insets(1, 1, 1, 1));
+        b.setFocusable(false);
+        b.setHorizontalTextPosition(SwingConstants.CENTER);
+        b.setVerticalTextPosition(SwingConstants.BOTTOM);
+        b.setFont(b.getFont().deriveFont(9f));
+        return b;
+    }
+
+    private static int selectedIndex(JToggleButton[] bs) {
+        for (int i = 0; i < bs.length; i++) if (bs[i].isSelected()) return i;
+        return -1;
+    }
+
+    private void changeColours(boolean swap) {
+        int a = selectedIndex(swapFrom), b = selectedIndex(swapTo);
+        if (a < 0 || b < 0 || a == b) return;
+        colourMap = swap ? colourMap.swap(a, b) : colourMap.replace(a, b);
+        swapFromGroup.clearSelection();                     // done: choose the next pair from scratch
+        swapToGroup.clearSelection();
+        changed(Step.COLOURS);
+    }
+
+    /** The colour that has to be used before the swap so that colour c is shown (c itself if none). */
+    private int unmapped(int c) {
+        for (int i = 0; i < 16; i++) if (colourMap.get(i) == c) return i;
+        return c;
+    }
+
+    /** Colours of the shown result with their number of C64 pixels. */
+    private int[] resultColourCounts() {
+        Pipeline.Outputs o = outputs;
+        int[] n = new int[16];
+        if (o == null || o.colours() == null) return n;
+        Palette pal = palette();
+        java.util.Map<Integer, Integer> index = new HashMap<>();
+        for (int i = 15; i >= 0; i--) index.put(pal.rgb(i) & 0xFFFFFF, i);
+        int[] px = o.colours().getRGB(0, 0, 320, 200, null, 0, 320);
+        for (int v : px) {
+            Integer i = index.get(v & 0xFFFFFF);
+            if (i != null) n[i]++;
+        }
+        boolean wide = o.bitmap() != null ? o.bitmap().mode() == C64Mode.MULTICOLOR
+                : o.charset() != null && o.charset().multicolor;
+        if (wide) for (int i = 0; i < 16; i++) n[i] /= 2;
+        return n;
+    }
+
+    /** Swatches with the colours in use, the active changes and hints. */
+    private void updateColourSwap() {
+        int[] n = resultColourCounts();
+        Palette pal = palette();
+        for (int i = 0; i < 16; i++) {
+            swapFrom[i].setIcon(new ColourIcon(pal.rgb(i), 14));
+            swapFrom[i].setText(n[i] > 0 ? String.valueOf(n[i]) : " ");
+            swapFrom[i].setToolTipText(tr("swap.from.tip", i, tr("color." + i), n[i]));
+            swapFrom[i].setEnabled(source != null && n[i] > 0);
+            swapTo[i].setIcon(new ColourIcon(pal.rgb(i), 14));
+            swapTo[i].setText(String.valueOf(i));
+            swapTo[i].setToolTipText(tr("swap.to.tip", i, tr("color." + i)));
+            swapTo[i].setEnabled(source != null);
+        }
+        Pipeline.Outputs o = outputs;
+        String text;
+        if (o != null && o.bitmap() != null && !o.bitmap().ok() && !colourMap.isIdentity()) text = tr("swap.needCheck");
+        else if (colourMap.isIdentity()) text = tr("swap.none");
+        else text = tr("swap.active", colourMap.describe());
+        if (o != null && o.charset() != null && o.charset().keptCells > 0)
+            text += " " + tr("swap.kept", o.charset().keptCells);
+        swapInfo.setText(wrapped("<small>" + text + "</small>"));
+        updateSwapButtons();
+    }
+
+    private void updateSwapButtons() {
+        int a = selectedIndex(swapFrom), b = selectedIndex(swapTo);
+        boolean ok = source != null && a >= 0 && b >= 0 && a != b && swapFrom[a].isEnabled();
+        swapButton.setEnabled(ok);
+        replaceButton.setEnabled(ok);
+        swapReset.setEnabled(source != null && !colourMap.isIdentity());
     }
 
     private JPanel buildPetsciiResult() {
@@ -1251,6 +1377,7 @@ public class MainWindow extends JFrame {
         m.put("pet.detail", detail.getValue());
         m.put("pet.diffusion", diffusion.getValue());
         m.put("pet.calm", calm.getValue());
+        m.put("swap.group", colourMap.toString());
         m.put("cs.mode", csMulti.isSelected());
         m.put("cs.max", (Integer) csMax.getValue());
         m.put("cs.tiles", (Integer) csTiles.getSelectedItem());
@@ -1297,6 +1424,7 @@ public class MainWindow extends JFrame {
             diffusion.setValue((Integer) m.get("pet.diffusion"));
             calm.setValue((Integer) m.get("pet.calm"));
             csMax.setValue(Math.max(2, Math.min(256, (Integer) m.get("cs.max"))));
+            colourMap = ColourMap.parse(String.valueOf(m.get("swap.group")));
             csTiles.setSelectedItem(m.get("cs.tiles"));
             select(csBackground, (Integer) m.get("cs.background"));
             select(csMc1, (Integer) m.get("cs.mc1"));
@@ -1336,7 +1464,7 @@ public class MainWindow extends JFrame {
                 pairR2L.isSelected() ? Pixelizer.Direction.R2L : Pixelizer.Direction.L2R,
                 palette(), (ColorMatcher.Space) spaceBox.getSelectedItem(),
                 dither, (Integer) backgroundBox.getSelectedItem(), fixClashes.isSelected(), ps, cs,
-                new BitmapConverter.Edits(Map.copyOf(cellEdits), Map.copyOf(pixelEdits)));
+                new BitmapConverter.Edits(Map.copyOf(cellEdits), Map.copyOf(pixelEdits)), colourMap);
     }
 
     /** A setting of a step changed: recompute from that step on (debounced). */
@@ -1438,6 +1566,7 @@ public class MainWindow extends JFrame {
                     updateViews();
                     updateEnabled();
                     updateCellPanel();
+                    updateColourSwap();
                     if (pendingExport != null) writePendingExport();
                 } catch (Exception ex) {
                     progress.setVisible(false);
@@ -1645,6 +1774,7 @@ public class MainWindow extends JFrame {
         showFinal.setEnabled(has && current != Step.ORIGINAL && current != Step.RESULT);   // those show it anyway
         rightPanel.setPixelListener(has && current == Step.RESULT && bitmap ? this::resultClicked : null);
         rightPanel.setToolTipText(tr(current == Step.RESULT && bitmap ? "preview.edit.tip" : "preview.tip"));
+        updateColourSwap();
     }
 
     // ================================================================ manual correction (bitmaps)
@@ -1655,8 +1785,9 @@ public class MainWindow extends JFrame {
         C64Mode m = o.bitmap().mode();
         int mx = x / m.pixelWidth(), cell = m.cellOf(mx, y);
         if (toolPaint.isSelected()) {
-            Integer colour = (Integer) paintColour.getSelectedItem();
-            if (colour == null) return;
+            Integer shown = (Integer) paintColour.getSelectedItem();
+            if (shown == null) return;
+            Integer colour = unmapped(shown);                 // edits are made before swapped colours
             Integer old = pixelEdits.put(y * m.width + mx, colour);
             if (Objects.equals(old, colour) && o.bitmap().indices()[y * m.width + mx] == colour) return;
             selectedCell = cell;
@@ -1727,7 +1858,7 @@ public class MainWindow extends JFrame {
 
     private void applyCellColours() {
         if (selectedCell < 0) return;
-        cellEdits.put(selectedCell, chosenColours());
+        cellEdits.put(selectedCell, Arrays.stream(chosenColours()).map(this::unmapped).toArray());
         removePixelEditsInCell(selectedCell);
         changed(Step.COLOURS);
     }

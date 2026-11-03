@@ -30,6 +30,8 @@ public final class CharsetImage {
     public final int[] colours = new int[CELLS];
     /** Number of different characters the picture had before they were merged. */
     public int uniqueBefore;
+    /** Cells that kept their colour when colours were swapped (multicolour characters only take 0–7). */
+    public int keptCells;
 
     /** Edge length of the meta tiles in characters (1 = no tiles). */
     public int tileSize = 1;

@@ -83,6 +83,8 @@ public final class Cli {
               --charset-png FILE.png  chars: also write the character set as picture (16 per row)
               --only charset|map|all  chars: write only the character set (NAME_charset.bin) or only the
                                       mapping (screen, colours, tiles, map .bin); default all + NAME.asm
+              --swap A,B              koala/hires/petscii/chars: exchange colours A and B in the result (repeatable)
+              --replace A,B           koala/hires/petscii/chars: show colour B wherever A is (repeatable)
               -h, --help              this help
             """;
 
@@ -119,6 +121,7 @@ public final class Cli {
         boolean modeGiven = false;
         Path charsetPng = null;
         CharsetImage.Part only = CharsetImage.Part.ALL;
+        ColourMap colourMap = ColourMap.identity();
         try {
             for (int i = 1; i < args.length; i++) {
                 String a = args[i];
@@ -165,6 +168,13 @@ public final class Cli {
                     case "--mc1" -> mc1 = colourArg("--mc1", next(args, ++i));
                     case "--mc2" -> mc2 = colourArg("--mc2", next(args, ++i));
                     case "--charset-png" -> charsetPng = Path.of(next(args, ++i));
+                    case "--swap", "--replace" -> {
+                        String[] ab = next(args, ++i).split("[,:]");
+                        if (ab.length != 2) throw new IllegalArgumentException(a + " needs two colours, e.g. " + a + " 6,14");
+                        int x = Integer.parseInt(ab[0].trim()), y = Integer.parseInt(ab[1].trim());
+                        if (x < 0 || x > 15 || y < 0 || y > 15) throw new IllegalArgumentException(a + ": colours are 0..15");
+                        colourMap = a.equals("--swap") ? colourMap.swap(x, y) : colourMap.replace(x, y);
+                    }
                     case "--only" -> {
                         String v = next(args, ++i).toLowerCase(Locale.ROOT);
                         only = switch (v) {
@@ -230,8 +240,8 @@ public final class Cli {
                                 + src.getWidth() + " x " + src.getHeight() + " (use --fit).");
                     }
                     src = prepared(src, adjust);
-                    PetsciiImage p = PetsciiConverter.convert(src, pal, space,
-                            new PetsciiConverter.Settings(charset, text, bg, detailV, diffusionV, calmV, ds));
+                    PetsciiImage p = colourMap.apply(PetsciiConverter.convert(src, pal, space,
+                            new PetsciiConverter.Settings(charset, text, bg, detailV, diffusionV, calmV, ds)));
                     Path target = out != null ? out : Images.sibling(in, ".petmate");
                     String name = in.getFileName().toString().replaceFirst("\\.[^.]+$", "");
                     Files.writeString(target, p.toPetmate(name), java.nio.charset.StandardCharsets.UTF_8);
@@ -254,8 +264,8 @@ public final class Cli {
                     src = prepared(src, adjust);
                     boolean mc = modeGiven && mode == C64Mode.MULTICOLOR;
                     if (mc) src = Pixelizer.pixelize(src, pair);
-                    CharsetImage c = CharsetConverter.convert(src, pal, space,
-                            new CharsetConverter.Settings(mc, maxChars, tiles, bg, mc1, mc2), ds);
+                    CharsetImage c = colourMap.apply(CharsetConverter.convert(src, pal, space,
+                            new CharsetConverter.Settings(mc, maxChars, tiles, bg, mc1, mc2), ds));
                     Path target = out != null ? out : Images.sibling(in, ".asm");
                     String base = CharsetImage.baseOf(target.getFileName().toString());
                     Path dirOut = target.toAbsolutePath().getParent();
@@ -275,8 +285,10 @@ public final class Cli {
                     BufferedImage src = Images.read(in, pal);
                     if (!BitmapConverter.isValidSize(src) && fit != null) src = fitted(src, fit);
                     if (BitmapConverter.isValidSize(src)) src = prepared(src, adjust);
-                    BitmapConverter.Result r = BitmapConverter.convert(src, new BitmapConverter.Settings(
-                            mode, pal, space, pair, palettize, bg, fix && !cmd.equals("check"), ds));
+                    BitmapConverter.Settings bs = new BitmapConverter.Settings(
+                            mode, pal, space, pair, palettize, bg, fix && !cmd.equals("check"), ds);
+                    BitmapConverter.Result r = BitmapConverter.convert(src, bs);
+                    if (!cmd.equals("check")) r = colourMap.apply(r, bs);
                     if (cmd.equals("check")) {
                         if (r.ok()) {
                             System.out.println("OK: " + in + " keeps the " + mode.name().toLowerCase(Locale.ROOT)

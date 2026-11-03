@@ -80,6 +80,10 @@ class CliTest {
         assertFalse(Files.exists(dir.resolve("only.asm")));
         assertFalse(Files.exists(dir.resolve("only_screen.bin")));
         assertEquals(1, Cli.run(new String[]{"chars", in.toString(), "--only", "sprites"}));
+        assertEquals(0, Cli.run(new String[]{"koala", in.toString(), "-o", dir.resolve("sw.kla").toString(), "--fix-clashes",
+                "--swap", "0,1", "--replace", "6,14"}));
+        assertEquals(0, Cli.run(new String[]{"check", dir.resolve("sw.kla").toString(), "--no-palettize"}));
+        assertEquals(1, Cli.run(new String[]{"koala", in.toString(), "--swap", "0,16"}));
     }
 
     @Test

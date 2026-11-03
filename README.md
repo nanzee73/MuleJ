@@ -113,6 +113,7 @@ Saving (*Save character set ▾*: everything, only the character set, or only th
 * **Manual correction** by clicking into the result: *Select cell* shows its colours with pixel counts – press the
   colours the cell may use and *Apply colours*, or *Automatic* for the best colours of this cell; *Paint* sets single
   pixels; *Reset cell* / *Discard all* undo. Corrected cells are marked yellow, the selected cell cyan.
+* **Swap colours** (every target): exchange two colours or replace one with another in the finished picture; applied last, keeps the C64 rules, saved in the project and every exported file (CLI: `--swap A,B`, `--replace A,B`).
 * PETSCII and character sets always keep their rules; to edit PETSCII further, save as Petmate file.
 * **Save Koala / Art Studio / Petmate / KickAssembler…** and **Save PRG…** (only once the colour check has passed) start in the folder of
   the source picture. The PRG shows the picture after `LOAD"NAME",8` and `RUN`; any key returns to BASIC.

@@ -19,6 +19,7 @@ Kommandozeile.</p>
 <li><a href="#petscii">PETSCII-Einstellungen</a></li>
 <li><a href="#charset">Zeichensatz & Tiles</a></li>
 <li><a href="#result">Schritt 6: Ergebnis – Farbcheck, Korrektur, Bearbeiten</a></li>
+<li><a href="#swap">Farben tauschen</a></li>
 <li><a href="#save">Speichern</a></li>
 <li><a href="#projects">Projekte</a></li>
 <li><a href="#preview">Vorschau, Zoomen und Verschieben</a></li>
@@ -170,6 +171,20 @@ Zellen (nach einer Rückfrage).</li>
 <li><b>Alle korrigieren</b> gibt jeder Zelle mit zu vielen Farben die Farben, die sie am besten wiedergeben – wie
 <i>Automatisch</i>, aber für alle Konfliktzellen auf einmal. Danach lässt sich jede Zelle weiter von Hand ändern oder
 zurücksetzen.</li>
+</ul>
+
+<a name="swap"></a><h2>Farben tauschen</h2>
+<p>Unter dem Farbcheck ändert <b>Farben tauschen</b> Farben des fertigen Bildes – für jedes Ziel. Oben stehen die Farben
+des Ergebnisses mit ihrer Pixelzahl, unten die 16 C64-Farben.</p>
+<ul>
+<li>Oben eine Farbe wählen, unten die neue Farbe. <b>Tauschen ⇄</b> vertauscht beide überall; <b>Ersetzen →</b> zeigt die
+neue Farbe überall dort, wo die gewählte ist (beide werden eine).</li>
+<li>Änderungen lassen sich kombinieren; die Zeile darunter zeigt sie (z. B. „6 → 14, 14 → 6“). <b>Originalfarben</b> nimmt
+alle zurück, <b>Bearbeiten ▸ Rückgängig</b> die letzte. Sie werden im Projekt gespeichert.</li>
+<li>Der Tausch kommt zuletzt, nach Farbcheck und deinen Korrekturen, und landet in jeder gespeicherten Datei und PRG. Er
+hält die C64-Regeln ein, weil keine Zelle mehr Farben bekommt. Bei Multicolor-Bitmaps wandert der Hintergrund mit.</li>
+<li>Bitmaps: Farben werden erst getauscht, wenn der Farbcheck bestanden ist. Multicolor-Zeichen: Zellen können nur die
+Farben 0–7 nutzen – Zellen, deren neue Farbe 8–15 wäre, behalten ihre Farbe (die Zeile darunter sagt, wie viele).</li>
 </ul>
 
 <a name="save"></a><h2>Speichern</h2>

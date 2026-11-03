@@ -18,6 +18,7 @@ C64:ans färgregler och kan korrigera de celler som inte gör det. Allt fungerar
 <li><a href="#petscii">PETSCII-inställningar</a></li>
 <li><a href="#charset">Teckenuppsättning och brickor</a></li>
 <li><a href="#result">Steg 6: Resultat – färgkontroll, korrigering, redigering</a></li>
+<li><a href="#swap">Byt färger</a></li>
 <li><a href="#save">Spara</a></li>
 <li><a href="#projects">Projekt</a></li>
 <li><a href="#preview">Förhandsvisningar, zoom och panorering</a></li>
@@ -164,6 +165,20 @@ pixlar; <i>Måla</i> – ett vänsterklick eller dragning sätter pixlar till de
 <b>Återställ cell</b> kastar dina färger och målade pixlar, <b>Kasta allt</b> gör det för alla celler (efter en fråga).</li>
 <li><b>Korrigera alla</b> ger varje cell med för många färger de färger som återger den bäst – som <i>Automatiskt</i>,
 men för alla konfliktceller på en gång. Därefter kan varje cell fortfarande ändras eller återställas för hand.</li>
+</ul>
+
+<a name="swap"></a><h2>Byt färger</h2>
+<p>Under färgkontrollen ändrar <b>Byt färger</b> färger i den färdiga bilden – för alla mål. Överst visas resultatets
+färger med antal pixlar, nederst de 16 C64-färgerna.</p>
+<ul>
+<li>Välj en färg överst och den nya färgen nederst. <b>Byt ⇄</b> byter plats på båda överallt; <b>Ersätt →</b> visar den nya
+färgen överallt där den valda finns (båda blir en).</li>
+<li>Ändringar kan kombineras; raden under visar dem (t.ex. ”6 → 14, 14 → 6”). <b>Originalfärger</b> tar tillbaka alla,
+<b>Redigera ▸ Ångra</b> den senaste. De sparas i projektet.</li>
+<li>Bytet kommer sist, efter färgkontrollen och dina korrigeringar, och hamnar i varje sparad fil och PRG. Det följer
+C64-reglerna, eftersom ingen cell får fler färger. För multicolor-bitmappar följer bakgrunden med.</li>
+<li>Bitmappar: färger byts först när färgkontrollen är godkänd. Multicolor-tecken: cellerna kan bara använda färgerna
+0–7 – celler vars nya färg skulle vara 8–15 behåller sin färg (raden under visar hur många).</li>
 </ul>
 
 <a name="save"></a><h2>Spara</h2>
