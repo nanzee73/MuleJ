@@ -690,7 +690,7 @@ public class MainWindow extends JFrame {
 
     /**
      * Swap colours of the finished picture (applied last, for every target): one bar with the 16 colours, a click
-     * opens a menu with the 15 others, choosing one swaps both.
+     * opens a menu with the 15 others; for each the two colours can be swapped, or the clicked one replaced.
      */
     private JPanel buildColourSwap() {
         JPanel p = group("swap.group");
@@ -718,19 +718,30 @@ public class MainWindow extends JFrame {
         return p;
     }
 
-    /** Menu below a colour of the bar with the 15 other colours; choosing one swaps the two. */
+    /** Menu below a colour of the bar with the 15 other colours, each with "swap" and "replace". */
     private void showSwapMenu(int colour) {
         JPopupMenu m = new JPopupMenu();
         Palette pal = palette();
         for (int i = 0; i < 16; i++) {
             if (i == colour) continue;
             int other = i;
-            JMenuItem item = new JMenuItem(i + " " + tr("color." + i), new ColourIcon(pal.rgb(i), 14));
-            item.addActionListener(e -> {
+            JMenu target = new JMenu(i + " " + tr("color." + i));
+            target.setIcon(new ColourIcon(pal.rgb(i), 14));
+            JMenuItem swap = new JMenuItem(tr("swap.doSwap", colour, other));
+            swap.setToolTipText(tr("swap.doSwap.tip"));
+            swap.addActionListener(e -> {
                 colourMap = colourMap.swap(colour, other);
                 changed(Step.COLOURS);
             });
-            m.add(item);
+            JMenuItem replace = new JMenuItem(tr("swap.doReplace", colour, other));
+            replace.setToolTipText(tr("swap.doReplace.tip"));
+            replace.addActionListener(e -> {
+                colourMap = colourMap.replace(colour, other);
+                changed(Step.COLOURS);
+            });
+            target.add(swap);
+            target.add(replace);
+            m.add(target);
         }
         JButton b = swapBar[colour];
         m.show(b, 0, b.getHeight());
