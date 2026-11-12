@@ -1,0 +1,40 @@
+# Keeps the Actions storage small (free plan): after every workflow run, all runs except the two newest
+# are deleted, together with their logs and artifacts. Releases and their files are not touched.
+name: Clean up old runs
+
+on:
+  workflow_run:
+    workflows: ["Build & Release"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all but the two newest runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SELF: ${{ github.run_id }}
+        run: |
+          # newest first: id, status, workflow name
+          gh api --paginate "repos/$REPO/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | [.id, .status, .name] | @tsv' > runs.tsv
+          kept=0
+          while IFS=$'\t' read -r id status name; do
+            [ "$id" = "$SELF" ] && continue                 # this cleanup run itself
+            if [ "$name" != "Clean up old runs" ] && [ $kept -lt 2 ]; then
+              kept=$((kept + 1)); echo "keep   $id $name ($status)"; continue
+            fi
+            if [ "$status" != "completed" ]; then echo "busy   $id $name"; continue; fi
+            echo "delete $id $name"
+            gh api -X DELETE "repos/$REPO/actions/runs/$id" || true
+          done < runs.tsv
